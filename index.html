@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Добавить расход</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background: #f8f9fa; }
+    .container { max-width: 480px; }
+    #toast {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 1000;
+      display: none;
+    }
+    .list-group-item {
+      cursor: grab;
+    }
+    .drag-over {
+      border: 2px dashed #0d6efd;
+    }
+  </style>
+</head>
+<body>
+  <div class="container py-4" id="mainPage">
+    <h3 class="mb-4">Добавить расход</h3>
+
+    <form id="expenseForm" action="YOUR_GAS_SCRIPT_URL_HERE" method="post" target="hidden_iframe">
+
+      <div class="mb-3">
+        <label class="form-label">Дата расхода</label>
+        <input type="date" id="date" name="date" class="form-control" required>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Категория</label>
+        <select id="category" name="category" class="form-select" required></select>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Сумма</label>
+        <input type="number" name="amount" id="amount" class="form-control" required>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Пояснения</label>
+        <textarea name="note" id="note" class="form-control"></textarea>
+      </div>
+      <input type="hidden" id="spreadsheetIdHidden" name="spreadsheetId">
+      <button type="submit" id="submitBtn" class="btn btn-success w-100">Отправить</button>
+    </form>
+
+    <div class="text-center mt-3">
+      <a href="#" id="openSettings">⚙ Настройки</a>
+    </div>
+  </div>
+
+  <!-- Страница настроек -->
+  <div class="container py-4" id="settingsPage" style="display:none;">
+    <h3 class="mb-4">Настройки</h3>
+
+    <div class="mb-3">
+      <label class="form-label">Spreadsheet ID</label>
+      <input type="text" id="spreadsheetId" class="form-control">
+    </div>
+
+    <h5>Категории</h5>
+    <ul id="categoriesList" class="list-group mb-3"></ul>
+
+    <div class="input-group mb-3">
+      <input type="text" id="newCategory" class="form-control" placeholder="Добавить категорию">
+      <button type="button" id="addCategory" class="btn btn-primary">Добавить</button>
+    </div>
+
+    <div class="text-center mt-3">
+      <a href="#" id="backToMain">⬅ Назад</a>
+    </div>
+  </div>
+
+  <iframe name="hidden_iframe" style="display:none;"></iframe>
+
+  <div id="toast" class="alert alert-success"></div>
+
+  <script>
+    const defaultCategories = [
+      "Питание","Здоровье/медицина","Образование","Подарки","Дом","Транспорт",
+      "Коммунальные услуги","Развлечения","Одежда","Кафе/Ресторан","Алко","Услуги",
+      "Авто","Путешествия","Домашние животные","Резервная категория","Резервная категория2"
+    ];
+
+    const categorySelect = document.getElementById('category');
+    const submitBtn = document.getElementById('submitBtn');
+    const toast = document.getElementById('toast');
+    const spreadsheetInput = document.getElementById('spreadsheetId');
+    const categoriesList = document.getElementById('categoriesList');
+
+    let categories = JSON.parse(localStorage.getItem('categories') || 'null');
+    if (!categories) {
+      categories = defaultCategories;
+      localStorage.setItem('categories', JSON.stringify(categories));
+    }
+
+    let spreadsheetId = localStorage.getItem('spreadsheetId') || '';
+    document.getElementById('spreadsheetIdHidden').value = spreadsheetId;
+    spreadsheetInput.value = spreadsheetId;
+    
+    function saveCategories() {
+      localStorage.setItem('categories', JSON.stringify(categories));
+      renderCategoriesSelect();
+      renderCategoriesList();
+    }
+
+    function renderCategoriesSelect() {
+      categorySelect.innerHTML = '';
+      categories.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c;
+        opt.textContent = c;
+        categorySelect.appendChild(opt);
+      });
+    }
+
+    function renderCategoriesList() {
+      categoriesList.innerHTML = '';
+      categories.forEach((c, i) => {
+        const li = document.createElement('li');
+        li.className = 'list-group-item d-flex justify-content-between align-items-center';
+        li.draggable = true;
+        li.dataset.index = i;
+        li.innerHTML = `
+          <span class="cat-name">${c}</span>
+          <div>
+            <button class="btn btn-sm btn-warning me-2 edit-btn">✏</button>
+            <button class="btn btn-sm btn-danger delete-btn">🗑</button>
+          </div>
+        `;
+
+        li.querySelector('.delete-btn').addEventListener('click', () => {
+            if (confirm(`Удалить категорию "${c}"?`)) {
+                categories.splice(i, 1);
+                saveCategories();
+            }
+        });
+
+        li.querySelector('.edit-btn').addEventListener('click', () => {
+          const newName = prompt("Новое название категории:", c);
+          if (newName && !categories.includes(newName)) {
+            categories[i] = newName.trim();
+            saveCategories();
+          }
+        });
+
+        // Drag events
+        li.addEventListener('dragstart', e => {
+          e.dataTransfer.setData('text/plain', i);
+        });
+        li.addEventListener('dragover', e => {
+          e.preventDefault();
+          li.classList.add('drag-over');
+        });
+        li.addEventListener('dragleave', () => li.classList.remove('drag-over'));
+        li.addEventListener('drop', e => {
+          e.preventDefault();
+          li.classList.remove('drag-over');
+          const fromIndex = e.dataTransfer.getData('text/plain');
+          const toIndex = li.dataset.index;
+          if (fromIndex !== toIndex) {
+            const moved = categories.splice(fromIndex, 1)[0];
+            categories.splice(toIndex, 0, moved);
+            saveCategories();
+          }
+        });
+
+        categoriesList.appendChild(li);
+      });
+    }
+
+    renderCategoriesSelect();
+    renderCategoriesList();
+
+    // Установить текущую дату
+    document.getElementById('date').value = new Date().toISOString().substr(0,10);
+
+    document.getElementById('addCategory').addEventListener('click', () => {
+      const newCat = document.getElementById('newCategory').value.trim();
+      if(newCat && !categories.includes(newCat)) {
+        categories.push(newCat);
+        saveCategories();
+        document.getElementById('newCategory').value = '';
+      }
+    });
+
+    spreadsheetInput.addEventListener('input', () => {
+      localStorage.setItem('spreadsheetId', spreadsheetInput.value.trim());
+    });
+
+    // Переключение страниц
+    document.getElementById('openSettings').addEventListener('click', () => {
+      document.getElementById('mainPage').style.display = 'none';
+      document.getElementById('settingsPage').style.display = 'block';
+    });
+
+    document.getElementById('backToMain').addEventListener('click', () => {
+      // сохраняем id в localStorage (если изменили) и в скрытое поле формы
+      const id = (spreadsheetInput.value || '').trim();
+      localStorage.setItem('spreadsheetId', id);
+      document.getElementById('spreadsheetIdHidden').value = id;
+
+      // обновляем список категорий в форме (на случай изменений)
+      renderCategoriesSelect();
+
+      document.getElementById('settingsPage').style.display = 'none';
+      document.getElementById('mainPage').style.display = 'block';
+    });
+
+    document.getElementById('expenseForm').addEventListener('submit', (e) => {
+      const id = (spreadsheetInput.value || '').trim();
+      if (!id) {
+        showToast('Укажите ID таблицы в настройках', 'danger');
+        e.preventDefault(); // блокируем отправку, пока нет ID
+        return;
+      }
+
+      // сохраняем и кладем в скрытое поле, чтобы форма послала id
+      localStorage.setItem('spreadsheetId', id);
+      document.getElementById('spreadsheetIdHidden').value = id;
+
+      submitBtn.disabled = true;
+
+      // UX: показать уведомление и очистить поля после отправки (задержка)
+      setTimeout(() => {
+        showToast('Данные отправлены', 'success');
+        document.getElementById('amount').value = '';
+        document.getElementById('note').value = '';
+        submitBtn.disabled = false;
+      }, 500);
+    });
+
+
+    function showToast(msg, type='success') {
+      toast.textContent = msg;
+      toast.className = 'alert alert-' + type;
+      toast.style.display = 'block';
+      setTimeout(() => toast.style.display = 'none', 2000);
+    }
+  </script>
+</body>
+</html>
