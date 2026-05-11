@@ -2,248 +2,1218 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title>Добавить расход</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Finance Tracker</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
   <style>
-    body { background: #f8f9fa; }
-    .container { max-width: 480px; }
-    #toast {
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      z-index: 1000;
-      display: none;
+    :root {
+      --bg:   var(--tg-theme-bg-color, #F0F2F5);
+      --text: var(--tg-theme-text-color, #1C1C1E);
+      --hint: var(--tg-theme-hint-color, #8E8E93);
+      --sub:  var(--tg-theme-secondary-bg-color, #FFFFFF);
+      --acc:  var(--tg-theme-button-color, #007AFF);
+      --out:      #D65D5D;
+      --out-soft: rgba(214, 93, 93, .13);
+      --out-glow: rgba(214, 93, 93, .30);
+      --in:       #5DA371;
+      --in-soft:  rgba(93, 163, 113, .13);
+      --in-glow:  rgba(93, 163, 113, .30);
+      --surface: var(--sub);
+      --border:  rgba(120,120,128,.16);
+      --sh:      0 2px 12px rgba(0,0,0,.07);
+      --sh-lg:   0 8px 32px rgba(0,0,0,.13);
+      --r:    14px;
+      --r-lg: 20px;
+      --ease: cubic-bezier(.4,0,.2,1);
     }
-    .list-group-item {
-      cursor: grab;
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif;
+      overscroll-behavior: none;
+      -webkit-tap-highlight-color: transparent;
+      -webkit-font-smoothing: antialiased;
     }
-    .drag-over {
-      border: 2px dashed #0d6efd;
-    }
+    #content { padding: 0 0 calc(68px + env(safe-area-inset-bottom, 0px)); min-height: 100dvh; }
+    .tab-panel { padding: 16px; display: none; }
+    .tab-panel.active { display: block; }
+
+    /* Segmented type control */
+    .seg { display: flex; gap: 5px; background: var(--surface); border-radius: var(--r); padding: 5px; box-shadow: var(--sh); margin-bottom: 18px; }
+    .seg-btn { flex: 1; border: none; border-radius: calc(var(--r) - 4px); padding: 11px 6px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all .22s var(--ease); color: var(--hint); background: transparent; display: flex; align-items: center; justify-content: center; gap: 7px; }
+    .seg-btn i { font-size: 17px; }
+    .seg-btn.active-out { color: #fff; background: var(--out); box-shadow: 0 3px 10px var(--out-glow); }
+    .seg-btn.active-in  { color: #fff; background: var(--in);  box-shadow: 0 3px 10px var(--in-glow); }
+
+    /* Quick pills */
+    #quickCats { flex-wrap: wrap; margin-bottom: 14px; }
+    .qpill { font-size: 12px; font-weight: 500; padding: 5px 14px; border-radius: 20px; border: 1.5px solid; cursor: pointer; transition: all .15s; white-space: nowrap; background: transparent; }
+    .qpill:active { transform: scale(.95); }
+
+    /* iOS grouped form card */
+    .form-card { background: var(--surface); border-radius: var(--r-lg); box-shadow: var(--sh); overflow: hidden; margin-bottom: 14px; }
+    .frow { display: flex; align-items: center; padding: 13px 16px; gap: 10px; position: relative; }
+    .frow + .frow::before { content: ''; position: absolute; top: 0; left: 16px; right: 0; height: 1px; background: var(--border); }
+    .frow-lbl { font-size: 14px; font-weight: 500; white-space: nowrap; min-width: 116px; color: var(--text); display: flex; align-items: center; gap: 5px; }
+    .opt-badge { font-size: 10px; font-weight: 400; color: var(--hint); background: rgba(128,128,128,.12); border-radius: 4px; padding: 1px 5px; letter-spacing: .2px; }
+    .frow input, .frow select, .frow textarea { flex: 1; border: none; outline: none; background: transparent; font-size: 14px; color: var(--text); text-align: right; font-family: inherit; }
+    .frow textarea { resize: none; line-height: 1.4; }
+    .frow input::placeholder, .frow textarea::placeholder { color: var(--hint); }
+    .frow input[type="date"] { text-align: right; }
+    .frow select { -webkit-appearance: none; appearance: none; cursor: pointer; }
+    .frow .si { color: var(--hint); font-size: 13px; pointer-events: none; }
+    .frow.amt { padding: 15px 16px; }
+    .frow.amt input { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.5px; }
+    .amt-cur { font-size: 18px; font-weight: 600; color: var(--hint); }
+
+    /* Submit button */
+    .submit-btn { width: 100%; border: none; border-radius: var(--r-lg); padding: 15px; font-size: 16px; font-weight: 700; cursor: pointer; transition: all .2s var(--ease); letter-spacing: .2px; }
+    .submit-btn:active { transform: scale(.97); }
+    .submit-btn.out { background: var(--out); color: #fff; box-shadow: 0 4px 18px var(--out-glow); }
+    .submit-btn.in  { background: var(--in);  color: #fff; box-shadow: 0 4px 18px var(--in-glow); }
+
+    /* Bottom nav */
+    #bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: var(--surface); border-top: 1px solid var(--border); display: flex; padding-bottom: env(safe-area-inset-bottom, 0); z-index: 1000; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
+    .nav-btn { flex: 1; border: none; background: none; padding: 8px 4px 6px; font-size: 10px; font-weight: 500; color: var(--hint); display: flex; flex-direction: column; align-items: center; gap: 3px; cursor: pointer; transition: color .15s var(--ease); }
+    .nav-btn i { font-size: 23px; display: block; transition: transform .2s var(--ease); }
+    .nav-btn.active { color: var(--acc); }
+    .nav-btn.active i { transform: scale(1.12); }
+
+    /* Summary */
+    .sum-topbar { display: flex; align-items: center; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+    .mode-pill { padding: 6px 15px; border-radius: 20px; font-size: 13px; font-weight: 500; border: 1.5px solid var(--border); background: transparent; color: var(--hint); cursor: pointer; transition: all .15s; }
+    .mode-pill.active { background: var(--acc); color: #fff; border-color: var(--acc); }
+    .mode-pill.sm { padding: 6px 11px; font-size: 12px; }
+    .period-row { background: var(--surface); border-radius: var(--r); display: flex; align-items: center; gap: 6px; padding: 9px 12px; box-shadow: var(--sh); margin-bottom: 14px; }
+    #periodLabel { flex: 1; font-weight: 600; font-size: 15px; text-align: center; }
+    .pchev { background: none; border: none; cursor: pointer; color: var(--acc); padding: 4px 8px; border-radius: 8px; font-size: 18px; line-height: 1; transition: background .12s; }
+    .pchev:active { background: rgba(0,122,255,.12); }
+    .sum-section { background: var(--surface); border-radius: var(--r-lg); box-shadow: var(--sh); overflow: hidden; margin-bottom: 12px; }
+    .sum-hdr { display: flex; justify-content: space-between; align-items: center; padding: 11px 16px; border-bottom: 1px solid var(--border); }
+    .sum-hdr-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; display: flex; align-items: center; gap: 6px; }
+    .sum-hdr-total { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .sum-row { display: flex; align-items: center; padding: 10px 16px; gap: 10px; position: relative; }
+    .sum-row + .sum-row::before { content: ''; position: absolute; top: 0; left: 16px; right: 0; height: 1px; background: var(--border); }
+    .sum-row-info { flex: 1; min-width: 0; }
+    .sum-row-name { font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .sum-bar { height: 3px; border-radius: 2px; background: var(--border); margin-top: 4px; overflow: hidden; }
+    .sum-bar-fill { height: 100%; border-radius: 2px; }
+    .sum-row-right { text-align: right; white-space: nowrap; }
+    .sum-row-amt { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; display: block; }
+    .sum-row-pct { font-size: 11px; color: var(--hint); }
+    .balance-card { background: var(--surface); border-radius: var(--r-lg); box-shadow: var(--sh); padding: 14px 18px; display: flex; justify-content: space-between; align-items: center; }
+    .balance-lbl { font-size: 15px; font-weight: 600; }
+    .balance-amt { font-size: 24px; font-weight: 800; font-variant-numeric: tabular-nums; }
+
+    /* Settings */
+    .s-section { background: var(--surface); border-radius: var(--r-lg); box-shadow: var(--sh); overflow: hidden; margin-bottom: 16px; }
+    .s-row { display: flex; align-items: center; padding: 12px 16px; gap: 10px; position: relative; }
+    .s-row + .s-row::before { content: ''; position: absolute; top: 0; left: 16px; right: 0; height: 1px; background: var(--border); }
+    .s-row input { flex: 1; border: none; outline: none; background: transparent; font-size: 14px; color: var(--text); font-family: inherit; }
+    .s-row input::placeholder { color: var(--hint); }
+    .s-btn { width: 100%; border: none; border-radius: var(--r); padding: 13px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all .15s; display: flex; align-items: center; justify-content: center; gap: 7px; background: var(--surface); color: var(--acc); box-shadow: var(--sh); }
+    .s-btn:active { transform: scale(.97); }
+    .s-hint { font-size: 12px; color: var(--hint); text-align: center; margin-top: 8px; }
+    #sIdHint { font-size: 12px; color: var(--hint); padding: 2px 0 10px 4px; display: none; }
+    .sec-hdr { font-size: 12px; font-weight: 600; color: var(--hint); text-transform: uppercase; letter-spacing: .6px; padding: 0 2px 8px; }
+    .cat-seg { display: flex; gap: 4px; background: var(--surface); border-radius: var(--r); padding: 4px; margin-bottom: 12px; box-shadow: var(--sh); }
+    .cat-seg-btn { flex: 1; border: none; border-radius: calc(var(--r) - 3px); padding: 8px 6px; font-size: 13px; font-weight: 500; cursor: pointer; transition: all .15s; color: var(--hint); background: transparent; }
+    .cat-seg-btn.active-out { color: #fff; background: var(--out); }
+    .cat-seg-btn.active-in  { color: #fff; background: var(--in); }
+    .new-cat-row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+    .new-cat-input { flex: 1; border: none; outline: none; background: var(--surface); border-radius: var(--r); padding: 12px 14px; font-size: 14px; color: var(--text); font-family: inherit; box-shadow: var(--sh); }
+    .new-cat-input::placeholder { color: var(--hint); }
+    .new-cat-add { width: 44px; height: 44px; border: none; border-radius: var(--r); background: var(--acc); color: #fff; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,122,255,.3); transition: all .15s; }
+    .new-cat-add:active { transform: scale(.93); }
+    .cat-list { background: var(--surface); border-radius: var(--r-lg); box-shadow: var(--sh); overflow: hidden; }
+    .cat-item { display: flex; align-items: center; gap: 8px; padding: 11px 16px; position: relative; }
+    .cat-item + .cat-item::before { content: ''; position: absolute; top: 0; left: 16px; right: 0; height: 1px; background: var(--border); }
+    .drag-handle { color: var(--hint); cursor: grab; touch-action: none; font-size: 18px; }
+    .cat-label   { flex: 1; font-size: 15px; font-weight: 500; }
+    .cat-action { background: none; border: none; cursor: pointer; color: var(--hint); font-size: 16px; padding: 5px; border-radius: 8px; transition: background .12s; }
+    .cat-action:hover { background: rgba(0,0,0,.06); }
+    .lang-seg { display: flex; gap: 4px; background: var(--surface); border-radius: var(--r); padding: 4px; box-shadow: var(--sh); }
+    .lang-btn { flex: 1; border: none; border-radius: calc(var(--r) - 3px); padding: 9px 4px; font-size: 13px; font-weight: 500; cursor: pointer; transition: all .15s; color: var(--hint); background: transparent; }
+    .lang-btn.active { color: #fff; background: var(--acc); }
+
+    /* Toast */
+    #toast-wrap { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 9999; pointer-events: none; }
+    #toast-box { background: rgba(28,28,30,.88); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); color: #fff; border-radius: 12px; padding: 10px 20px; font-size: 14px; font-weight: 500; text-align: center; min-width: 180px; max-width: 88vw; opacity: 0; transform: translateY(-10px) scale(.96); transition: opacity .22s var(--ease), transform .22s var(--ease); }
+    #toast-box.show { opacity: 1; transform: translateY(0) scale(1); }
+    #toast-box.t-err  { background: rgba(255,59,48,.9); }
+    #toast-box.t-warn { background: rgba(255,149,0,.9); }
+
+    /* No-ID banner */
+    #no-id-banner { background: rgba(255,149,0,.1); color: #b35900; padding: 10px 16px; font-size: 13px; text-align: center; border-bottom: 1px solid rgba(255,149,0,.18); }
+
+    /* Lang picker */
+    #lang-picker { position: fixed; inset: 0; z-index: 9999; background: var(--bg); display: none; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 32px; }
+    #lang-picker h4 { text-align: center; margin-bottom: 8px; font-size: 1.2rem; font-weight: 700; }
+    .lang-pick-btn { width: 220px; padding: 14px; font-size: 15px; font-weight: 600; border-radius: var(--r); border: 1.5px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; box-shadow: var(--sh); transition: all .15s; }
+    .lang-pick-btn:active { transform: scale(.97); }
+
+    /* User name prompt overlay */
+    #user-name-prompt { position: fixed; inset: 0; z-index: 9998; background: var(--bg); display: none; flex-direction: column; align-items: center; justify-content: center; gap: 20px; padding: 32px; }
+    .un-prompt-card { width: 100%; max-width: 320px; background: var(--surface); border-radius: var(--r-lg); box-shadow: var(--sh-lg); padding: 24px; text-align: center; }
+    .un-prompt-title { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+    .un-prompt-text { font-size: 14px; color: var(--hint); margin-bottom: 20px; }
+    .un-input { width: 100%; border: 1.5px solid var(--border); border-radius: var(--r); padding: 12px 14px; font-size: 15px; background: var(--surface); color: var(--text); outline: none; transition: border-color .15s; margin-bottom: 20px; text-align: center; }
+    .un-input:focus { border-color: var(--acc); }
+
+    /* Modal */
+    .modal-content { border: none !important; border-radius: var(--r-lg) !important; box-shadow: var(--sh-lg) !important; background: var(--surface) !important; }
+    .modal-header, .modal-footer { border: none !important; }
+
+    /* Period Picker */
+    .month-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .month-btn { border: 1.5px solid var(--border); background: var(--surface); border-radius: var(--r); padding: 10px 5px; font-size: 13px; font-weight: 600; color: var(--text); cursor: pointer; transition: all .15s; }
+    .month-btn.active { background: var(--acc); color: #fff; border-color: var(--acc); }
+    .month-btn:active { transform: scale(.95); }
+    .year-list { display: flex; flex-direction: column; gap: 8px; max-height: 300px; overflow-y: auto; }
+    .year-btn { border: 1.5px solid var(--border); background: var(--surface); border-radius: var(--r); padding: 12px; font-size: 15px; font-weight: 600; color: var(--text); cursor: pointer; text-align: center; }
+    .year-btn.active { background: var(--acc); color: #fff; border-color: var(--acc); }
+    #periodLabel { cursor: pointer; }
   </style>
 </head>
 <body>
-  <div class="container py-4" id="mainPage">
-    <h3 class="mb-4">Добавить расход</h3>
 
-    <form id="expenseForm" action="YOUR_GAS_SCRIPT_URL_HERE" method="post" target="hidden_iframe">
+<div id="lang-picker">
+  <h4 style="text-align:center">
+    Выберите язык · Choose language · Chọn ngôn ngữ
+  </h4>
+  <button class="lang-pick-btn" onclick="setLang('ru')">&#x1F1F7;&#x1F1FA; &nbsp;Русский</button>
+  <button class="lang-pick-btn" onclick="setLang('en')">&#x1F1EC;&#x1F1E7; &nbsp;English</button>
+  <button class="lang-pick-btn" onclick="setLang('vi')">&#x1F1FB;&#x1F1F3; &nbsp;Tiếng Việt</button>
+</div>
 
-      <div class="mb-3">
-        <label class="form-label">Дата расхода</label>
-        <input type="date" id="date" name="date" class="form-control" required>
+<div id="user-name-prompt">
+  <div class="un-prompt-card">
+    <div class="un-prompt-title" data-i18n="user_profile">Профиль пользователя</div>
+    <div class="un-prompt-text" data-i18n="setup_user_name_text">Представьтесь, пожалуйста, для ведения учета</div>
+    <input type="text" id="iUserNameInput" class="un-input" 
+           data-i18n-placeholder="user_name_placeholder"
+           placeholder="Ваше имя">
+    <button class="submit-btn out" onclick="finishSetup()" data-i18n="save">Сохранить</button>
+  </div>
+</div>
+
+<div id="no-id-banner" style="display:none;">
+  <span data-i18n-html="banner">Укажите ссылку на таблицу в <strong>&#x2699; Настройках</strong></span>
+</div>
+
+<div id="content">
+
+  <!-- TAB: MAIN -->
+  <div id="tab-main" class="tab-panel active">
+
+    <div class="seg">
+      <button id="btnOut" class="seg-btn" onclick="setType('outflow')">
+        <i class="bi bi-arrow-up-circle-fill"></i>
+        <span data-i18n="expense">Расход</span>
+      </button>
+      <button id="btnIn" class="seg-btn" onclick="setType('inflow')">
+        <i class="bi bi-arrow-down-circle-fill"></i>
+        <span data-i18n="inflow">Доход</span>
+      </button>
+    </div>
+
+    <div id="quickCats" class="d-flex gap-2" style="display:none!important;"></div>
+
+    <div class="form-card">
+
+      <div class="frow">
+        <label class="frow-lbl" for="fDate" data-i18n="date">Дата</label>
+        <input type="date" id="fDate">
       </div>
 
-      <div class="mb-3">
-        <label class="form-label">Категория</label>
-        <select id="category" name="category" class="form-select" required></select>
+      <div class="frow">
+        <label class="frow-lbl" for="fCategory" data-i18n="category">Категория</label>
+        <select id="fCategory"></select>
+        <i class="bi bi-chevron-right si"></i>
       </div>
 
-      <div class="mb-3">
-        <label class="form-label">Сумма</label>
-        <input type="number" name="amount" id="amount" class="form-control" required>
+      <div class="frow">
+        <label class="frow-lbl" for="fSubcategory">
+          <span data-i18n="subcategory">Подкатегория</span>
+          <span class="opt-badge" data-i18n="optional_badge">опц.</span>
+        </label>
+        <select id="fSubcategory"></select>
+        <i class="bi bi-chevron-right si"></i>
       </div>
 
-      <div class="mb-3">
-        <label class="form-label">Пояснения</label>
-        <textarea name="note" id="note" class="form-control"></textarea>
+      <div class="frow amt">
+        <label class="frow-lbl" for="fAmount" data-i18n="amount">Сумма</label>
+        <input type="number" id="fAmount" placeholder="0" min="0" step="any" inputmode="decimal">
       </div>
-      <input type="hidden" id="spreadsheetIdHidden" name="spreadsheetId">
-      <button type="submit" id="submitBtn" class="btn btn-success w-100">Отправить</button>
-    </form>
 
-    <div class="text-center mt-3">
-      <a href="#" id="openSettings">⚙ Настройки</a>
+      <div class="frow">
+        <label class="frow-lbl" for="fAccount">
+          <span data-i18n="account">Счёт</span>
+          <span class="opt-badge" data-i18n="optional_badge">опц.</span>
+        </label>
+        <select id="fAccount"></select>
+        <i class="bi bi-chevron-right si"></i>
+      </div>
+
+      <div class="frow">
+        <label class="frow-lbl" for="fNote">
+          <span data-i18n="description">Описание</span>
+          <span class="opt-badge" data-i18n="optional_badge">опц.</span>
+        </label>
+        <textarea id="fNote" rows="1"
+                  data-i18n-placeholder="optional" placeholder="Необязательно"></textarea>
+      </div>
+
+    </div>
+
+    <button id="submitBtn" class="submit-btn out" onclick="submitForm()">
+      <span data-i18n="save">Сохранить</span>
+    </button>
+  </div>
+
+  <!-- TAB: SUMMARY -->
+  <div id="tab-summary" class="tab-panel">
+
+    <div class="sum-topbar">
+      <button class="mode-pill" id="modeMonth" onclick="setSummaryMode('month')" data-i18n="month">Месяц</button>
+      <button class="mode-pill" id="modeYear"  onclick="setSummaryMode('year')"  data-i18n="year">Год</button>
+      <div class="ms-auto d-flex gap-2">
+        <button class="mode-pill sm" onclick="setSummaryQuick('current')" data-i18n="current">Текущий</button>
+      </div>
+    </div>
+
+    <div class="sum-topbar mt-2" style="border-top:1px solid rgba(0,0,0,0.05); padding-top:8px;">
+      <button class="mode-pill" id="viewCategory"    onclick="setSummaryView('category')"    data-i18n="category">Категория</button>
+      <button class="mode-pill" id="viewSubcategory" onclick="setSummaryView('subcategory')" data-i18n="subcategory">Подкатегория</button>
+      <button class="mode-pill" id="viewAccount"     onclick="setSummaryView('account')"     data-i18n="account">Счёт</button>
+    </div>
+
+    <div class="period-row">
+      <button class="pchev" onclick="shiftPeriod(-1)"><i class="bi bi-chevron-left"></i></button>
+      <span id="periodLabel" onclick="openPeriodPicker()">…</span>
+      <button class="pchev" onclick="shiftPeriod(1)"><i class="bi bi-chevron-right"></i></button>
+    </div>
+
+    <div id="summaryContent">
+      <div class="text-center py-5"><div class="spinner-border spinner-border-sm text-secondary"></div></div>
     </div>
   </div>
 
-  <!-- Страница настроек -->
-  <div class="container py-4" id="settingsPage" style="display:none;">
-    <h3 class="mb-4">Настройки</h3>
+  <!-- TAB: SETTINGS -->
+  <div id="tab-settings" class="tab-panel">
 
-    <div class="mb-3">
-      <label class="form-label">Spreadsheet ID</label>
-      <input type="text" id="spreadsheetId" class="form-control">
+    <div class="sec-hdr" data-i18n="google_table">Таблица Google Sheets</div>
+    <div class="s-section">
+      <div class="s-row">
+        <i class="bi bi-link-45deg" style="color:var(--hint);font-size:18px;flex-shrink:0"></i>
+        <input type="text" id="sSheetInput"
+               data-i18n-placeholder="table_placeholder"
+               placeholder="Ссылка или ID таблицы">
+      </div>
+    </div>
+    <div id="sIdHint"></div>
+    <button class="s-btn mb-4" onclick="saveSheetId()">
+      <i class="bi bi-arrow-repeat"></i>
+      <span data-i18n="save_sync">Сохранить и синхронизировать</span>
+    </button>
+
+    <div class="sec-hdr" data-i18n="user_profile">Профиль пользователя</div>
+    <div class="s-section">
+      <div class="s-row">
+        <i class="bi bi-person" style="color:var(--hint);font-size:18px;flex-shrink:0"></i>
+        <input type="text" id="sUserNameInput"
+               data-i18n-placeholder="user_name_placeholder"
+               placeholder="Ваше имя (для записей)">
+      </div>
+    </div>
+    <button class="s-btn mb-4" onclick="saveUserName()">
+      <i class="bi bi-check2"></i>
+      <span data-i18n="save_user_name">Сохранить имя</span>
+    </button>
+
+    <div class="sec-hdr" data-i18n="categories">Категории</div>
+    <div class="cat-seg">
+      <button id="sCatOut" class="cat-seg-btn" onclick="setSettingsCatType('outflow')" data-i18n="expenses_cat">Расходы</button>
+      <button id="sCatIn"  class="cat-seg-btn" onclick="setSettingsCatType('inflow')"  data-i18n="inflow_cat">Доходы</button>
     </div>
 
-    <h5>Категории</h5>
-    <ul id="categoriesList" class="list-group mb-3"></ul>
-
-    <div class="input-group mb-3">
-      <input type="text" id="newCategory" class="form-control" placeholder="Добавить категорию">
-      <button type="button" id="addCategory" class="btn btn-primary">Добавить</button>
+    <div class="new-cat-row">
+      <input type="text" id="sNewCat" class="new-cat-input"
+             data-i18n-placeholder="new_cat_placeholder"
+             placeholder="Новая категория…"
+             onkeydown="if(event.key==='Enter') addCategory()">
+      <button class="new-cat-add" onclick="addCategory()">
+        <i class="bi bi-plus-lg"></i>
+      </button>
     </div>
 
-    <div class="text-center mt-3">
-      <a href="#" id="backToMain">⬅ Назад</a>
+    <div id="catList" class="cat-list mb-3"></div>
+
+    <button class="s-btn" onclick="restoreHidden()">
+      <i class="bi bi-eye"></i>
+      <span data-i18n="restore_hidden">Восстановить скрытые</span>
+    </button>
+    <p class="s-hint" data-i18n="delete_hint">
+      Удаление скрывает категорию только локально — из таблицы не удаляется
+    </p>
+
+    <div class="sec-hdr mt-3" data-i18n="accounts_section">Счета</div>
+    <div class="new-cat-row">
+      <input type="text" id="sNewAccount" class="new-cat-input"
+             data-i18n-placeholder="new_account_placeholder"
+             placeholder="Новый счёт…"
+             onkeydown="if(event.key==='Enter') addListItem('accounts')">
+      <button class="new-cat-add" onclick="addListItem('accounts')">
+        <i class="bi bi-plus-lg"></i>
+      </button>
     </div>
+    <div id="accountSettingsList" class="cat-list mb-3"></div>
+    <button class="s-btn mb-1" onclick="restoreHiddenAccounts()">
+      <i class="bi bi-eye"></i>
+      <span data-i18n="accounts_restored">Восстановить скрытые счета</span>
+    </button>
+
+    <div class="sec-hdr mt-3" data-i18n="subcats_section">Подкатегории</div>
+    <div class="new-cat-row">
+      <input type="text" id="sNewSubcat" class="new-cat-input"
+             data-i18n-placeholder="new_subcat_placeholder"
+             placeholder="Новая подкатегория…"
+             onkeydown="if(event.key==='Enter') addListItem('subcats')">
+      <button class="new-cat-add" onclick="addListItem('subcats')">
+        <i class="bi bi-plus-lg"></i>
+      </button>
+    </div>
+    <div id="subcatSettingsList" class="cat-list mb-3"></div>
+    <button class="s-btn mb-1" onclick="restoreHiddenSubcats()">
+      <i class="bi bi-eye"></i>
+      <span data-i18n="subcats_restored">Восстановить скрытые подкатегории</span>
+    </button>
+
+    <div class="sec-hdr mt-3" data-i18n="language">Язык</div>
+    <div class="lang-seg">
+      <button id="langRu" class="lang-btn" onclick="setLang('ru')">RU Русский</button>
+      <button id="langEn" class="lang-btn" onclick="setLang('en')">EN English</button>
+      <button id="langVi" class="lang-btn" onclick="setLang('vi')">VI Tiếng Việt</button>
+    </div>
+
   </div>
 
-  <iframe name="hidden_iframe" style="display:none;"></iframe>
+</div>
 
-  <div id="toast" class="alert alert-success"></div>
+<nav id="bottom-nav">
+  <button class="nav-btn active" id="nav-main" onclick="showTab('main')">
+    <i class="bi bi-pencil-square"></i><span data-i18n="nav_record">Запись</span>
+  </button>
+  <button class="nav-btn" id="nav-summary" onclick="showTab('summary')">
+    <i class="bi bi-bar-chart-line"></i><span data-i18n="nav_summary">Сводка</span>
+  </button>
+  <button class="nav-btn" id="nav-settings" onclick="showTab('settings')">
+    <i class="bi bi-gear"></i><span data-i18n="nav_settings">Настройки</span>
+  </button>
+</nav>
 
-  <script>
-    const defaultCategories = [
-      "Питание","Здоровье/медицина","Образование","Подарки","Дом","Транспорт",
-      "Коммунальные услуги","Развлечения","Одежда","Кафе/Ресторан","Алко","Услуги",
-      "Авто","Путешествия","Домашние животные","Резервная категория","Резервная категория2"
-    ];
+<div class="modal fade" id="dupModal" tabindex="-1">
+...
+</div>
 
-    const categorySelect = document.getElementById('category');
-    const submitBtn = document.getElementById('submitBtn');
-    const toast = document.getElementById('toast');
-    const spreadsheetInput = document.getElementById('spreadsheetId');
-    const categoriesList = document.getElementById('categoriesList');
+<div class="modal fade" id="periodModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered mx-3">
+    <div class="modal-content">
+      <div class="modal-header pb-0 px-4 pt-4">
+        <h6 class="modal-title" id="periodModalTitle" data-i18n="select_period">Выбор периода</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body px-4 pt-3 pb-4">
+        <div id="pickerYearSelect" class="d-flex align-items-center justify-content-between mb-3">
+            <button class="pchev" onclick="pickerShiftYear(-1)"><i class="bi bi-chevron-left"></i></button>
+            <span id="pickerYearLabel" style="font-weight:700; font-size:18px;"></span>
+            <button class="pchev" onclick="pickerShiftYear(1)"><i class="bi bi-chevron-right"></i></button>
+        </div>
+        <div id="monthGrid" class="month-grid"></div>
+        <div id="yearList" class="year-list" style="display:none"></div>
+      </div>
+    </div>
+  </div>
+</div>
 
-    let categories = JSON.parse(localStorage.getItem('categories') || 'null');
-    if (!categories) {
-      categories = defaultCategories;
-      localStorage.setItem('categories', JSON.stringify(categories));
+<div id="toast-wrap">
+  <div id="toast-box"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+// ════════════════════════════════════════════════════════════════
+//  CONFIGURATION — вставьте URL Google Apps Script
+// ════════════════════════════════════════════════════════════════
+const GAS_URL = 'YOUR_GAS_SCRIPT_URL_HERE';
+const APP_ID = 'rasshody'; // unique prefix — change per bot deployment
+
+const DEF_OUTFLOW_CATS = ['Other'];
+const DEF_INFLOW_CATS  = ['Other'];
+
+const LANG = {
+  ru: {
+    nav_record:'Запись', nav_summary:'Сводка', nav_settings:'Настройки',
+    expense:'Расход', inflow:'Доход',
+    date:'Дата', category:'Категория', subcategory:'Подкатегория', account:'Счёт',
+    amount:'Сумма', description:'Описание', optional:'Необязательно', optional_badge:'опц.',
+    save:'Сохранить', month:'Месяц', year:'Год', prev:'Предыд.', current:'Текущий',
+    no_records:'Нет записей за этот период', setup_table:'Настройте таблицу в ⚙ Настройках',
+    expenses_title:'Расходы', inflow_title:'Доходы', balance:'Баланс', no_data:'Нет данных',
+    google_table:'Таблица Google Sheets', table_placeholder:'Ссылка или ID таблицы',
+    save_sync:'Сохранить и синхронизировать', categories:'Категории',
+    expenses_cat:'Расходы', inflow_cat:'Доходы', new_cat_placeholder:'Новая категория…',
+    restore_hidden:'Восстановить скрытые',
+    delete_hint:'Удаление скрывает категорию только локально — из таблицы не удаляется',
+    language:'Язык', banner:'Укажите ссылку на таблицу в <strong>⚙ Настройках</strong>',
+    fill_required:'Заполните дату, категорию и сумму',
+    set_table_warn:'Укажите ссылку на таблицу в Настройках',
+    table_connected:'Таблица подключена, категории синхронизированы',
+    sync_error:'Ошибка синхронизации', enter_table:'Введите ссылку или ID таблицы',
+    expense_saved:'Расход сохранён ✓', inflow_saved:'Доход сохранён ✓', error_prefix:'Ошибка: ',
+    cat_exists:(n)=>`Категория уже есть: «${n}»`, cat_added:'Категория добавлена',
+    all_restored:'Все категории восстановлены', possible_dup:'Возможный дубль',
+    dup_text:'Сегодня уже есть запись с такими же параметрами. Внести ещё раз?',
+    cancel:'Отмена', yes_add:'Да, внести', hide_title:'Скрыть', rename_title:'Переименовать',
+    rename_prompt:'Новое название:',
+    accounts_section:'Счета', subcats_section:'Подкатегории',
+    new_account_placeholder:'Новый счёт…', new_subcat_placeholder:'Новая подкатегория…',
+    account_added:'Счёт добавлен', subcat_added:'Подкатегория добавлена',
+    item_exists:(n)=>`Уже есть: «${n}»`,
+    accounts_restored:'Скрытые счета восстановлены', subcats_restored:'Скрытые подкатегории восстановлены',
+    no_account:'— не выбрано —', no_subcat:'— не выбрано —',
+    user_profile:'Профиль пользователя', user_name_placeholder:'Ваше имя (для записей)',
+    save_user_name:'Сохранить имя', user_name_saved:'Имя сохранено',
+    setup_user_name_text:'Представьтесь, пожалуйста, для ведения учета',
+    year_format:(y)=>`${y} год`, month_format:(mon,y)=>`${mon} ${y}`,
+    months:['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'],
+    select_period:'Выбор периода',
+  },
+  en: {
+    nav_record:'Record', nav_summary:'Summary', nav_settings:'Settings',
+    expense:'Outflow', inflow:'Inflow',
+    date:'Date', category:'Category', subcategory:'Subcategory', account:'Account',
+    amount:'Amount', description:'Note', optional:'Optional', optional_badge:'opt.',
+    save:'Save', month:'Month', year:'Year', prev:'Prev.', current:'Current',
+    no_records:'No records for this period', setup_table:'Set up your table in ⚙ Settings',
+    expenses_title:'Outflow', inflow_title:'Inflow', balance:'Balance', no_data:'No data',
+    google_table:'Google Sheets Table', table_placeholder:'Link or Table ID',
+    save_sync:'Save and sync', categories:'Categories',
+    expenses_cat:'Outflow', inflow_cat:'Inflow', new_cat_placeholder:'New category…',
+    restore_hidden:'Restore hidden',
+    delete_hint:'Hiding a category only hides it locally — not deleted from the spreadsheet',
+    language:'Language', banner:'Set up your spreadsheet in <strong>⚙ Settings</strong>',
+    fill_required:'Please fill in date, category and amount',
+    set_table_warn:'Set up your spreadsheet in Settings',
+    table_connected:'Table connected, categories synced',
+    sync_error:'Sync error', enter_table:'Enter a link or Table ID',
+    expense_saved:'Outflow saved ✓', inflow_saved:'Inflow saved ✓', error_prefix:'Error: ',
+    cat_exists:(n)=>`Category already exists: «${n}»`, cat_added:'Category added',
+    all_restored:'All categories restored', possible_dup:'Possible duplicate',
+    dup_text:'There is already a record today with the same parameters. Add again?',
+    cancel:'Cancel', yes_add:'Yes, add', hide_title:'Hide', rename_title:'Rename',
+    rename_prompt:'New name:',
+    accounts_section:'Accounts', subcats_section:'Subcategories',
+    new_account_placeholder:'New account…', new_subcat_placeholder:'New subcategory…',
+    account_added:'Account added', subcat_added:'Subcategory added',
+    item_exists:(n)=>`Already exists: «${n}»`,
+    accounts_restored:'Hidden accounts restored', subcats_restored:'Hidden subcategories restored',
+    no_account:'— none —', no_subcat:'— none —',
+    user_profile:'User Profile', user_name_placeholder:'Your name (for records)',
+    save_user_name:'Save Name', user_name_saved:'Name saved',
+    setup_user_name_text:'Please introduce yourself to start tracking',
+    year_format:(y)=>String(y), month_format:(mon,y)=>`${mon} ${y}`,
+    months:['January','February','March','April','May','June','July','August','September','October','November','December'],
+    select_period:'Select Period',
+  },
+  vi: {
+    nav_record:'Ghi chép', nav_summary:'Tổng quan', nav_settings:'Cài đặt',
+    expense:'Chi tiêu', inflow:'Thu nhập',
+    date:'Ngày', category:'Danh mục', subcategory:'Danh mục phụ', account:'Tài khoản',
+    amount:'Số tiền', description:'Ghi chú', optional:'Không bắt buộc', optional_badge:'tùy chọn',
+    save:'Lưu', month:'Tháng', year:'Năm', prev:'Trước', current:'Hiện tại',
+    no_records:'Không có dữ liệu cho kỳ này', setup_table:'Thiết lập bảng tính trong ⚙ Cài đặt',
+    expenses_title:'Khoản chi', inflow_title:'Khoản thu', balance:'Số dư', no_data:'Không có dữ liệu',
+    google_table:'Bảng tính Google Sheets', table_placeholder:'Liên kết hoặc ID bảng tính',
+    save_sync:'Lưu và đồng bộ', categories:'Danh mục',
+    expenses_cat:'Chi tiêu', inflow_cat:'Thu nhập', new_cat_placeholder:'Danh mục mới…',
+    restore_hidden:'Khôi phục đã ẩn',
+    delete_hint:'Ẩn danh mục chỉ ẩn trên thiết bị này — không xóa khỏi bảng tính',
+    language:'Ngôn ngữ', banner:'Thiết lập bảng tính trong <strong>⚙ Cài đặt</strong>',
+    fill_required:'Vui lòng nhập ngày, danh mục và số tiền',
+    set_table_warn:'Thiết lập bảng tính trong Cài đặt',
+    table_connected:'Đã kết nối bảng tính, danh mục đã đồng bộ',
+    sync_error:'Lỗi đồng bộ', enter_table:'Nhập liên kết hoặc ID bảng tính',
+    expense_saved:'Đã lưu khoản chi ✓', inflow_saved:'Đã lưu khoản thu ✓', error_prefix:'Lỗi: ',
+    cat_exists:(n)=>`Danh mục đã tồn tại: «${n}»`, cat_added:'Đã thêm danh mục',
+    all_restored:'Đã khôi phục tất cả danh mục', possible_dup:'Có thể trùng lặp',
+    dup_text:'Đã có một bản ghi tương tự trong hôm nay. Bạn vẫn muốn thêm chứ?',
+    cancel:'Hủy', yes_add:'Đồng ý', hide_title:'Ẩn', rename_title:'Đổi tên',
+    rename_prompt:'Tên mới:',
+    accounts_section:'Tài khoản', subcats_section:'Danh mục phụ',
+    new_account_placeholder:'Tài khoản mới…', new_subcat_placeholder:'Danh mục phụ mới…',
+    account_added:'Đã thêm tài khoản', subcat_added:'Đã thêm danh mục phụ',
+    item_exists:(n)=>`Đã tồn tại: «${n}»`,
+    accounts_restored:'Đã khôi phục tài khoản ẩn', subcats_restored:'Đã khôi phục danh mục phụ ẩn',
+    no_account:'— chưa chọn —', no_subcat:'— chưa chọn —',
+    user_profile:'Hồ sơ người dùng', user_name_placeholder:'Nhập tên của bạn…',
+    save_user_name:'Lưu thông tin', user_name_saved:'Đã cập nhật tên',
+    setup_user_name_text:'Vui lòng nhập tên của bạn để bắt đầu sử dụng',
+    year_format:(y)=>`Năm ${y}`, month_format:(mon,y)=>`${mon} năm ${y}`,
+    months:['Tháng 1','Tháng 2','Tháng 3','Tháng 4','Tháng 5','Tháng 6','Tháng 7','Tháng 8','Tháng 9','Tháng 10','Tháng 11','Tháng 12'],
+    select_period:'Chọn khoảng thời gian',
+  },
+};
+
+function t(key) { return (LANG[S.lang]??LANG.en)[key]??LANG.en[key]??key; }
+
+const S = {
+  spreadsheetId: lsGet('spreadsheetId'),
+  userName:      lsGet('userName'),
+  expenseType:   lsGet('expenseType')||'outflow',
+  settingsCatType:'outflow',
+  summaryMode:   lsGet('summaryMode')||'month',
+  summaryView:   lsGet('summaryView')||'category',
+  summaryPeriod: '',
+  tgUser: null,
+  lang: lsGet('lang'),
+  catCache: load('catCache',{}),
+  hidden:   load('hidden',{outflow:[],inflow:[]}),
+  freq:     load('freq',{}),
+  accounts:        load('accounts',[]),
+  hiddenAccounts:  load('hiddenAccounts',[]),
+  subcats:         load('subcats',[]),
+  hiddenSubcats:   load('hiddenSubcats',[]),
+};
+
+// Migrate old expense/inflow key names from v1
+(function(){
+  let dirty=false;
+  for(const s of [S.catCache,S.hidden,S.freq]){
+    if('expense' in s){s.outflow=s.outflow||s.expense;delete s.expense;dirty=true;}
+    if('inflow'  in s){s.inflow =s.inflow ||s.inflow; delete s.inflow; dirty=true;}
+  }
+  if(dirty){save('catCache',S.catCache);save('hidden',S.hidden);save('freq',S.freq);}
+  if(S.expenseType==='expense'){S.expenseType='outflow';lsSet('expenseType','outflow');}
+  if(S.expenseType==='inflow') {S.expenseType='inflow'; lsSet('expenseType','inflow');}
+})();
+
+function lsGet(k,d=''){return localStorage.getItem(APP_ID+':'+k)??d;}
+function lsSet(k,v){localStorage.setItem(APP_ID+':'+k,v);}
+function load(key,def){try{return JSON.parse(lsGet(key,'null'))||def;}catch{return def;}}
+function save(key,val){lsSet(key,JSON.stringify(val));}
+
+function applyLang(){
+  document.documentElement.lang=S.lang||'en';
+  document.querySelectorAll('[data-i18n]').forEach(el=>{const v=t(el.dataset.i18n);if(typeof v==='string')el.textContent=v;});
+  document.querySelectorAll('[data-i18n-html]').forEach(el=>{const v=t(el.dataset.i18nHtml);if(typeof v==='string')el.innerHTML=v;});
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el=>{const v=t(el.dataset.i18nPlaceholder);if(typeof v==='string')el.placeholder=v;});
+  updateLangButtons();
+  setType(S.expenseType);
+  if(document.getElementById('tab-settings').classList.contains('active'))renderCatList();
+  if(document.getElementById('tab-summary').classList.contains('active')&&S.summaryPeriod)loadSummary();
+}
+
+function updateLangButtons(){
+  ['ru','en','vi'].forEach(c=>{const b=document.getElementById('lang'+c[0].toUpperCase()+c.slice(1));if(b)b.className='lang-btn'+(S.lang===c?' active':'');});
+}
+
+function setLang(lang){
+  const first=!S.lang;
+  S.lang=lang; lsSet('lang',lang);
+  document.getElementById('lang-picker').style.display='none';
+  if(first){
+    applyLang();
+    if(S.tgUser){
+      const name = [S.tgUser.first_name, S.tgUser.last_name].filter(Boolean).join(' ') || S.tgUser.username;
+      if(name) document.getElementById('iUserNameInput').value = name;
     }
+    document.getElementById('user-name-prompt').style.display='flex';
+  } else {
+    applyLang();
+  }
+}
 
-    let spreadsheetId = localStorage.getItem('spreadsheetId') || '';
-    document.getElementById('spreadsheetIdHidden').value = spreadsheetId;
-    spreadsheetInput.value = spreadsheetId;
-    
-    function saveCategories() {
-      localStorage.setItem('categories', JSON.stringify(categories));
-      renderCategoriesSelect();
-      renderCategoriesList();
+function finishSetup(){
+  const name=document.getElementById('iUserNameInput').value.trim();
+  if(name){ S.userName=name; lsSet('userName',name); }
+  document.getElementById('user-name-prompt').style.display='none';
+  startApp();
+}
+
+function extractSheetId(s){const m=s.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);return m?m[1]:s.trim();}
+
+function activeCategories(type){
+  const def=type==='outflow'?DEF_OUTFLOW_CATS:DEF_INFLOW_CATS;
+  const all=S.catCache[type]||[...def];
+  const hid=S.hidden[type]||[];
+  return all.filter(c=>!hid.includes(c));
+}
+
+function topFreqCats(type){
+  const freq=S.freq[type]||{};
+  const active=activeCategories(type);
+  return Object.entries(freq).sort((a,b)=>b[1]-a[1]).map(([c])=>c).filter(c=>active.includes(c)).slice(0,3);
+}
+
+function formatMoney(n){return Number(n).toLocaleString('ru-RU');}
+function todayStr(){return new Date().toISOString().slice(0,10);}
+
+function currentPeriod(mode){
+  const n=new Date();
+  return mode==='year'?String(n.getFullYear()):`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}`;
+}
+function prevPeriod(p,mode){
+  if(mode==='year')return String(Number(p)-1);
+  const[y,m]=p.split('-').map(Number);
+  return m===1?`${y-1}-12`:`${y}-${String(m-1).padStart(2,'0')}`;
+}
+function nextPeriod(p,mode){
+  if(mode==='year')return String(Number(p)+1);
+  const[y,m]=p.split('-').map(Number);
+  return m===12?`${y+1}-01`:`${y}-${String(m+1).padStart(2,'0')}`;
+}
+function periodLabel(p,mode){
+  if(mode==='year')return t('year_format')(Number(p));
+  const mons=t('months');const[y,m]=p.split('-').map(Number);
+  return t('month_format')(mons[m-1],y);
+}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+async function apiGet(params){
+  params._t=Date.now();
+  const r=await fetch(GAS_URL+'?'+new URLSearchParams(params),{cache:'no-store'});
+  return r.json();
+}
+
+let _tt;
+function showToast(msg,type='success'){
+  const b=document.getElementById('toast-box');
+  b.textContent=msg;
+  b.className=type==='error'?'t-err':type==='warning'?'t-warn':'';
+  b.classList.add('show');
+  clearTimeout(_tt);
+  _tt=setTimeout(()=>b.classList.remove('show'),2800);
+}
+
+function showTab(tab){
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+tab).classList.add('active');
+  document.getElementById('nav-'+tab).classList.add('active');
+  if(tab==='summary')renderSummary();
+  if(tab==='settings'){renderCatList();renderAccountSettingsList();renderSubcatSettingsList();}
+}
+
+function setType(type){
+  S.expenseType=type; lsSet('expenseType',type);
+  const isOut=type==='outflow';
+  document.getElementById('btnOut').className='seg-btn'+(isOut?' active-out':'');
+  document.getElementById('btnIn').className ='seg-btn'+(!isOut?' active-in':'');
+  document.getElementById('submitBtn').className='submit-btn '+(isOut?'out':'in');
+  renderQuickCats(); renderCategorySelect();
+  if(!S.catCache[type]&&S.spreadsheetId)syncCategories(type);
+}
+
+async function syncCategories(type){
+  if(!S.spreadsheetId)return;
+  try{
+    const res=await apiGet({action:'getCategories',spreadsheetId:S.spreadsheetId,type});
+    if(res.status!=='ok')return;
+    const sheet=res.categories, hidden=S.hidden[type]||[], current=S.catCache[type]||[];
+    S.catCache[type]=[...current.filter(c=>sheet.includes(c)),...sheet.filter(c=>!current.includes(c)&&!hidden.includes(c))];
+    save('catCache',S.catCache);
+    renderQuickCats(); renderCategorySelect();
+  }catch{}
+}
+
+function renderQuickCats(){
+  const top=topFreqCats(S.expenseType), wrap=document.getElementById('quickCats');
+  wrap.innerHTML='';
+  if(!top.length){wrap.style.display='none';return;}
+  wrap.style.display='flex';
+  const color=S.expenseType==='outflow'?'var(--out)':'var(--in)';
+  top.forEach(cat=>{
+    const btn=document.createElement('button');
+    btn.className='qpill'; btn.textContent=cat;
+    btn.style.color=color; btn.style.borderColor=color;
+    btn.addEventListener('click',()=>{document.getElementById('fCategory').value=cat;});
+    wrap.appendChild(btn);
+  });
+}
+
+function renderCategorySelect(){
+  const sel=document.getElementById('fCategory'), prev=sel.value, cats=activeCategories(S.expenseType);
+  sel.innerHTML=cats.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
+  if(cats.includes(prev))sel.value=prev;
+}
+
+function activeAccounts(){
+  return S.accounts.filter(a=>!(S.hiddenAccounts||[]).includes(a));
+}
+function activeSubcats(){
+  return S.subcats.filter(s=>!(S.hiddenSubcats||[]).includes(s));
+}
+
+function renderAccountSelect(){
+  const sel=document.getElementById('fAccount'), prev=sel.value, items=activeAccounts();
+  sel.innerHTML=`<option value="">${esc(t('no_account'))}</option>`+items.map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join('');
+  if(items.includes(prev))sel.value=prev;
+}
+function renderSubcatSelect(){
+  const sel=document.getElementById('fSubcategory'), prev=sel.value, items=activeSubcats();
+  sel.innerHTML=`<option value="">${esc(t('no_subcat'))}</option>`+items.map(s=>`<option value="${esc(s)}">${esc(s)}</option>`).join('');
+  if(items.includes(prev))sel.value=prev;
+}
+
+function renderAccountSettingsList(){
+  const items=activeAccounts(), list=document.getElementById('accountSettingsList');
+  if(!list)return;
+  list.innerHTML='';
+  items.forEach((item,i)=>{
+    const row=document.createElement('div');
+    row.className='cat-item'; row.draggable=true; row.dataset.index=i;
+    row.innerHTML=`<span class="drag-handle"><i class="bi bi-grip-vertical"></i></span><span class="cat-label">${esc(item)}</span><button class="cat-action" title="${t('rename_title')}"><i class="bi bi-pencil"></i></button><button class="cat-action" title="${t('hide_title')}"><i class="bi bi-eye-slash"></i></button>`;
+    const[btnEdit,btnHide]=row.querySelectorAll('button');
+    btnEdit.addEventListener('click',()=>editListItem('accounts',item));
+    btnHide.addEventListener('click',()=>hideListItem('accounts',item));
+    row.addEventListener('dragstart',()=>{row._dragging=true;row.style.opacity='.4';});
+    row.addEventListener('dragend',()=>{row.style.opacity='';row._dragging=false;list.querySelectorAll('.cat-item').forEach(r=>r.style.background='');});
+    row.addEventListener('dragover',e=>{e.preventDefault();if(!row._dragging)row.style.background='rgba(0,122,255,.06)';});
+    row.addEventListener('dragleave',()=>{row.style.background='';});
+    row.addEventListener('drop',e=>{
+      e.preventDefault();row.style.background='';
+      const dragging=list.querySelector('[style*="opacity"]');
+      if(!dragging||dragging===row)return;
+      reorderList('accounts',Number(dragging.dataset.index),Number(row.dataset.index));
+    });
+    list.appendChild(row);
+  });
+}
+function renderSubcatSettingsList(){
+  const items=activeSubcats(), list=document.getElementById('subcatSettingsList');
+  if(!list)return;
+  list.innerHTML='';
+  items.forEach((item,i)=>{
+    const row=document.createElement('div');
+    row.className='cat-item'; row.draggable=true; row.dataset.index=i;
+    row.innerHTML=`<span class="drag-handle"><i class="bi bi-grip-vertical"></i></span><span class="cat-label">${esc(item)}</span><button class="cat-action" title="${t('rename_title')}"><i class="bi bi-pencil"></i></button><button class="cat-action" title="${t('hide_title')}"><i class="bi bi-eye-slash"></i></button>`;
+    const[btnEdit,btnHide]=row.querySelectorAll('button');
+    btnEdit.addEventListener('click',()=>editListItem('subcats',item));
+    btnHide.addEventListener('click',()=>hideListItem('subcats',item));
+    row.addEventListener('dragstart',()=>{row._dragging=true;row.style.opacity='.4';});
+    row.addEventListener('dragend',()=>{row.style.opacity='';row._dragging=false;list.querySelectorAll('.cat-item').forEach(r=>r.style.background='');});
+    row.addEventListener('dragover',e=>{e.preventDefault();if(!row._dragging)row.style.background='rgba(0,122,255,.06)';});
+    row.addEventListener('dragleave',()=>{row.style.background='';});
+    row.addEventListener('drop',e=>{
+      e.preventDefault();row.style.background='';
+      const dragging=list.querySelector('[style*="opacity"]');
+      if(!dragging||dragging===row)return;
+      reorderList('subcats',Number(dragging.dataset.index),Number(row.dataset.index));
+    });
+    list.appendChild(row);
+  });
+}
+
+function reorderList(kind,fromI,toI){
+  const active=kind==='accounts'?activeAccounts():activeSubcats();
+  const moved=active.splice(fromI,1)[0];
+  active.splice(toI,0,moved);
+  if(kind==='accounts'){
+    const hid=S.accounts.filter(a=>S.hiddenAccounts.includes(a));
+    S.accounts=[...active,...hid]; save('accounts',S.accounts);
+    renderAccountSettingsList(); renderAccountSelect();
+  } else {
+    const hid=S.subcats.filter(s=>S.hiddenSubcats.includes(s));
+    S.subcats=[...active,...hid]; save('subcats',S.subcats);
+    renderSubcatSettingsList(); renderSubcatSelect();
+  }
+}
+
+function hideListItem(kind,name){
+  if(kind==='accounts'){
+    if(!S.hiddenAccounts.includes(name))S.hiddenAccounts.push(name);
+    save('hiddenAccounts',S.hiddenAccounts);
+    renderAccountSettingsList(); renderAccountSelect();
+  } else {
+    if(!S.hiddenSubcats.includes(name))S.hiddenSubcats.push(name);
+    save('hiddenSubcats',S.hiddenSubcats);
+    renderSubcatSettingsList(); renderSubcatSelect();
+  }
+}
+
+function restoreHiddenAccounts(){
+  S.hiddenAccounts=[]; save('hiddenAccounts',S.hiddenAccounts);
+  renderAccountSettingsList(); renderAccountSelect(); showToast(t('accounts_restored'));
+}
+function restoreHiddenSubcats(){
+  S.hiddenSubcats=[]; save('hiddenSubcats',S.hiddenSubcats);
+  renderSubcatSettingsList(); renderSubcatSelect(); showToast(t('subcats_restored'));
+}
+
+async function addListItem(kind){
+  const inputId=kind==='accounts'?'sNewAccount':'sNewSubcat';
+  const input=document.getElementById(inputId), name=input.value.trim();
+  if(!name)return;
+  const existing=kind==='accounts'?S.accounts:S.subcats;
+  const dup=existing.find(c=>c.toLowerCase()===name.toLowerCase());
+  if(dup){showToast(t('item_exists')(dup),'warning');return;}
+  input.disabled=true;
+  if(S.spreadsheetId){
+    try{
+      const res=await apiGet({action:'addListItem',spreadsheetId:S.spreadsheetId,list:kind,name});
+      if(res.status==='duplicate'){showToast(t('item_exists')(res.existing),'warning');input.disabled=false;return;}
+      if(res.status!=='ok')throw new Error(res.message);
+    }catch(e){showToast(t('error_prefix')+e.message,'error');input.disabled=false;return;}
+  }
+  if(kind==='accounts'){
+    S.accounts=[...S.accounts,name]; save('accounts',S.accounts);
+    renderAccountSettingsList(); renderAccountSelect(); showToast(t('account_added'));
+  } else {
+    S.subcats=[...S.subcats,name]; save('subcats',S.subcats);
+    renderSubcatSettingsList(); renderSubcatSelect(); showToast(t('subcat_added'));
+  }
+  input.value=''; input.disabled=false;
+}
+
+async function editListItem(kind,oldName){
+  const newName=prompt(t('rename_prompt'),oldName)?.trim();
+  if(!newName||newName===oldName)return;
+  const existing=kind==='accounts'?S.accounts:S.subcats;
+  const dup=existing.find(c=>c.toLowerCase()===newName.toLowerCase()&&c!==oldName);
+  if(dup){showToast(t('item_exists')(dup),'warning');return;}
+  if(S.spreadsheetId){
+    try{
+      const res=await apiGet({action:'renameListItem',spreadsheetId:S.spreadsheetId,list:kind,oldName,newName});
+      if(res.status==='duplicate'){showToast(t('item_exists')(res.existing),'warning');return;}
+      if(res.status!=='ok')throw new Error(res.message);
+    }catch(e){showToast(t('error_prefix')+e.message,'error');return;}
+  }
+  if(kind==='accounts'){
+    const idx=S.accounts.indexOf(oldName);
+    if(idx!==-1){S.accounts[idx]=newName;save('accounts',S.accounts);}
+    const hidIdx=S.hiddenAccounts.indexOf(oldName);
+    if(hidIdx!==-1){S.hiddenAccounts[hidIdx]=newName;save('hiddenAccounts',S.hiddenAccounts);}
+    renderAccountSettingsList(); renderAccountSelect();
+  } else {
+    const idx=S.subcats.indexOf(oldName);
+    if(idx!==-1){S.subcats[idx]=newName;save('subcats',S.subcats);}
+    const hidIdx=S.hiddenSubcats.indexOf(oldName);
+    if(hidIdx!==-1){S.hiddenSubcats[hidIdx]=newName;save('hiddenSubcats',S.hiddenSubcats);}
+    renderSubcatSettingsList(); renderSubcatSelect();
+  }
+}
+
+async function syncAccounts(){
+  if(!S.spreadsheetId)return;
+  try{
+    const res=await apiGet({action:'getAccounts',spreadsheetId:S.spreadsheetId});
+    if(res.status!=='ok')return;
+    const sheet=res.values, hidden=S.hiddenAccounts||[], current=S.accounts;
+    S.accounts=[...current.filter(v=>sheet.some(s=>s.toLowerCase()===v.toLowerCase())),...sheet.filter(s=>!current.some(c=>c.toLowerCase()===s.toLowerCase())&&!hidden.some(h=>h.toLowerCase()===s.toLowerCase()))];
+    save('accounts',S.accounts);
+    renderAccountSelect(); renderAccountSettingsList();
+  }catch{}
+}
+async function syncSubcats(){
+  if(!S.spreadsheetId)return;
+  try{
+    const res=await apiGet({action:'getSubcats',spreadsheetId:S.spreadsheetId});
+    if(res.status!=='ok')return;
+    const sheet=res.values, hidden=S.hiddenSubcats||[], current=S.subcats;
+    S.subcats=[...current.filter(v=>sheet.some(s=>s.toLowerCase()===v.toLowerCase())),...sheet.filter(s=>!current.some(c=>c.toLowerCase()===s.toLowerCase())&&!hidden.some(h=>h.toLowerCase()===s.toLowerCase()))];
+    save('subcats',S.subcats);
+    renderSubcatSelect(); renderSubcatSettingsList();
+  }catch{}
+}
+
+async function submitForm(){
+  const date       =document.getElementById('fDate').value;
+  const category   =document.getElementById('fCategory').value;
+  const amount     =document.getElementById('fAmount').value;
+  const subcategory=document.getElementById('fSubcategory').value.trim();
+  const account    =document.getElementById('fAccount').value.trim();
+  const note       =document.getElementById('fNote').value.trim();
+
+  if(!date||!category||!amount){showToast(t('fill_required'),'warning');return;}
+  if(!S.spreadsheetId){showToast(t('set_table_warn'),'warning');showTab('settings');return;}
+
+  const btn=document.getElementById('submitBtn');
+  btn.disabled=true;
+  try{
+    if(date===todayStr()){
+      const dup=await apiGet({action:'checkDuplicate',spreadsheetId:S.spreadsheetId,date,amount,category,subcategory,note,account,userName:S.userName||'',type:S.expenseType});
+      if(dup.duplicate){btn.disabled=false;try{await confirmDuplicate();}catch{return;}btn.disabled=true;}
     }
+    await doSave(date,category,subcategory,amount,account,note);
+    if(!S.freq[S.expenseType])S.freq[S.expenseType]={};
+    S.freq[S.expenseType][category]=(S.freq[S.expenseType][category]||0)+1;
+    save('freq',S.freq);
+    document.getElementById('fAmount').value='';
+    document.getElementById('fSubcategory').value='';
+    document.getElementById('fAccount').value='';
+    document.getElementById('fNote').value='';
+    renderQuickCats();
+    showToast(S.expenseType==='outflow'?t('expense_saved'):t('inflow_saved'));
+  }catch(e){showToast(t('error_prefix')+e.message,'error');}
+  finally{btn.disabled=false;}
+}
 
-    function renderCategoriesSelect() {
-      categorySelect.innerHTML = '';
-      categories.forEach(c => {
-        const opt = document.createElement('option');
-        opt.value = c;
-        opt.textContent = c;
-        categorySelect.appendChild(opt);
-      });
-    }
+function confirmDuplicate(){
+  return new Promise((resolve,reject)=>{
+    const el=document.getElementById('dupModal');
+    const modal=bootstrap.Modal.getOrCreateInstance(el);
+    const btn=document.getElementById('dupConfirmBtn');
+    const onOk  =()=>{cleanup();resolve();};
+    const onHide=()=>{cleanup();reject(new Error('cancelled'));};
+    function cleanup(){btn.removeEventListener('click',onOk);el.removeEventListener('hidden.bs.modal',onHide);modal.hide();}
+    btn.addEventListener('click',onOk,{once:true});
+    el.addEventListener('hidden.bs.modal',onHide,{once:true});
+    modal.show();
+  });
+}
 
-    function renderCategoriesList() {
-      categoriesList.innerHTML = '';
-      categories.forEach((c, i) => {
-        const li = document.createElement('li');
-        li.className = 'list-group-item d-flex justify-content-between align-items-center';
-        li.draggable = true;
-        li.dataset.index = i;
-        li.innerHTML = `
-          <span class="cat-name">${c}</span>
-          <div>
-            <button class="btn btn-sm btn-warning me-2 edit-btn">✏</button>
-            <button class="btn btn-sm btn-danger delete-btn">🗑</button>
-          </div>
-        `;
+async function doSave(date,category,subcategory,amount,account,note){
+  const res=await apiGet({action:'addRecord',spreadsheetId:S.spreadsheetId,date,category,subcategory,amount,account,note,type:S.expenseType,firstName:S.tgUser?.first_name||'',lastName:S.tgUser?.last_name||'',username:S.tgUser?.username||'',userName:S.userName||''});
+  if(res.status!=='ok')throw new Error(res.message||'Server error');
+}
 
-        li.querySelector('.delete-btn').addEventListener('click', () => {
-            if (confirm(`Удалить категорию "${c}"?`)) {
-                categories.splice(i, 1);
-                saveCategories();
-            }
-        });
+function setSummaryMode(mode){S.summaryMode=mode;lsSet('summaryMode',mode);S.summaryPeriod=currentPeriod(mode);updateModeButtons();loadSummary();}
+function setSummaryView(view){S.summaryView=view;lsSet('summaryView',view);updateModeButtons();loadSummary();}
+function setSummaryQuick(which){const cur=currentPeriod(S.summaryMode);S.summaryPeriod=which==='prev'?prevPeriod(cur,S.summaryMode):cur;loadSummary();}
+function shiftPeriod(dir){S.summaryPeriod=dir<0?prevPeriod(S.summaryPeriod,S.summaryMode):nextPeriod(S.summaryPeriod,S.summaryMode);loadSummary();}
+function updateModeButtons(){
+  document.getElementById('modeMonth').className='mode-pill'+(S.summaryMode==='month'?' active':'');
+  document.getElementById('modeYear').className ='mode-pill'+(S.summaryMode==='year'?' active':'');
+  document.getElementById('viewCategory').className='mode-pill'+(S.summaryView==='category'?' active':'');
+  document.getElementById('viewSubcategory').className='mode-pill'+(S.summaryView==='subcategory'?' active':'');
+  document.getElementById('viewAccount').className='mode-pill'+(S.summaryView==='account'?' active':'');
+}
 
-        li.querySelector('.edit-btn').addEventListener('click', () => {
-          const newName = prompt("Новое название категории:", c);
-          if (newName && !categories.includes(newName)) {
-            categories[i] = newName.trim();
-            saveCategories();
-          }
-        });
+let _pickerYear = new Date().getFullYear();
+function openPeriodPicker(){
+  const [y,m] = S.summaryPeriod.split('-').map(Number);
+  _pickerYear = y || new Date().getFullYear();
+  renderPeriodPicker();
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('periodModal')).show();
+}
+function renderPeriodPicker(){
+  const mode = S.summaryMode;
+  const yearLabel = document.getElementById('pickerYearLabel');
+  const yearSelect = document.getElementById('pickerYearSelect');
+  const monthGrid = document.getElementById('monthGrid');
+  const yearList = document.getElementById('yearList');
+  if(mode === 'month'){
+    yearSelect.style.display = 'flex';
+    monthGrid.style.display = 'grid';
+    yearList.style.display = 'none';
+    yearLabel.textContent = _pickerYear;
+    const currentM = S.summaryPeriod.split('-')[1];
+    const currentY = S.summaryPeriod.split('-')[0];
+    monthGrid.innerHTML = t('months').map((mon, i) => {
+      const monthNum = String(i+1).padStart(2, '0');
+      const active = (currentY == _pickerYear && currentM == monthNum) ? 'active' : '';
+      return `<button class="month-btn ${active}" onclick="selectPickerMonth(${i+1})">${mon}</button>`;
+    }).join('');
+  } else {
+    yearSelect.style.display = 'none';
+    monthGrid.style.display = 'none';
+    yearList.style.display = 'flex';
+    const currentY = S.summaryPeriod;
+    let years = [];
+    const startY = new Date().getFullYear() + 1;
+    for(let i=0; i<10; i++) years.push(startY - i);
+    yearList.innerHTML = years.map(y => {
+      const active = (currentY == y) ? 'active' : '';
+      return `<button class="year-btn ${active}" onclick="selectPickerYear(${y})">${t('year_format')(y)}</button>`;
+    }).join('');
+  }
+}
+function pickerShiftYear(dir){ _pickerYear += dir; renderPeriodPicker(); }
+function selectPickerMonth(m){
+  S.summaryPeriod = `${_pickerYear}-${String(m).padStart(2, '0')}`;
+  bootstrap.Modal.getInstance(document.getElementById('periodModal')).hide();
+  loadSummary();
+}
+function selectPickerYear(y){
+  S.summaryPeriod = String(y);
+  bootstrap.Modal.getInstance(document.getElementById('periodModal')).hide();
+  loadSummary();
+}
+function renderSummary(){if(!S.summaryPeriod)S.summaryPeriod=currentPeriod(S.summaryMode);updateModeButtons();loadSummary();}
 
-        // Drag events
-        li.addEventListener('dragstart', e => {
-          e.dataTransfer.setData('text/plain', i);
-        });
-        li.addEventListener('dragover', e => {
-          e.preventDefault();
-          li.classList.add('drag-over');
-        });
-        li.addEventListener('dragleave', () => li.classList.remove('drag-over'));
-        li.addEventListener('drop', e => {
-          e.preventDefault();
-          li.classList.remove('drag-over');
-          const fromIndex = e.dataTransfer.getData('text/plain');
-          const toIndex = li.dataset.index;
-          if (fromIndex !== toIndex) {
-            const moved = categories.splice(fromIndex, 1)[0];
-            categories.splice(toIndex, 0, moved);
-            saveCategories();
-          }
-        });
+async function loadSummary(){
+  document.getElementById('periodLabel').textContent=periodLabel(S.summaryPeriod,S.summaryMode);
+  const c=document.getElementById('summaryContent');
+  if(!S.spreadsheetId){c.innerHTML=`<div class="text-center text-muted py-5">${t('setup_table')}</div>`;return;}
+  c.innerHTML='<div class="text-center py-5"><div class="spinner-border spinner-border-sm" style="color:var(--hint)"></div></div>';
+  try{
+    const res=await apiGet({action:'getSummary',spreadsheetId:S.spreadsheetId,period:S.summaryPeriod,groupBy:S.summaryMode,viewBy:S.summaryView});
+    if(res.status!=='ok')throw new Error(res.message);
+    renderSummaryData(res);
+  }catch(e){c.innerHTML=`<div class="text-center text-danger py-4"><i class="bi bi-exclamation-circle"></i> ${esc(e.message)}</div>`;}
+}
 
-        categoriesList.appendChild(li);
-      });
-    }
+function renderSummaryData(data){
+  const expenses=data.outflows||data.expenses||[], inflow=data.income||data.inflow||[];
+  const totExp=expenses.reduce((s,i)=>s+i.total,0), totInc=inflow.reduce((s,i)=>s+i.total,0);
+  const balance=totInc-totExp;
+  if(!expenses.length&&!inflow.length){document.getElementById('summaryContent').innerHTML=`<div class="text-center text-muted py-5">${t('no_records')}</div>`;return;}
 
-    renderCategoriesSelect();
-    renderCategoriesList();
+  const section=(items,total,col,lkey,icon)=>{
+    if(!items.length)return'';
+    const rows=items.map(item=>{
+      const pct=total>0?Math.round(item.total/total*100):0;
+      const label = item.label || item.category || 'Other';
+      return`<div class="sum-row"><div class="sum-row-info"><div class="sum-row-name" title="${esc(label)}">${esc(label)}</div><div class="sum-bar"><div class="sum-bar-fill" style="width:${pct}%;background:${col}"></div></div></div><div class="sum-row-right"><span class="sum-row-amt" style="color:${col}">${formatMoney(item.total)}</span><span class="sum-row-pct">${pct}%</span></div></div>`;
+    }).join('');
+    return`<div class="sum-section"><div class="sum-hdr"><div class="sum-hdr-title" style="color:${col}"><i class="bi ${icon}"></i> ${t(lkey)}</div><div class="sum-hdr-total" style="color:${col}">${formatMoney(total)}</div></div>${rows}</div>`;
+  };
 
-    // Установить текущую дату
-    document.getElementById('date').value = new Date().toISOString().substr(0,10);
+  const bc=balance>=0?'var(--in)':'var(--out)';
+  document.getElementById('summaryContent').innerHTML=
+    section(expenses,totExp,'var(--out)','expenses_title','bi-arrow-up-circle-fill')+
+    section(inflow,totInc,'var(--in)','inflow_title','bi-arrow-down-circle-fill')+
+    `<div class="balance-card"><span class="balance-lbl">${t('balance')}</span><span class="balance-amt" style="color:${bc}">${balance>=0?'+':''}${formatMoney(balance)}</span></div>`;
+}
 
-    document.getElementById('addCategory').addEventListener('click', () => {
-      const newCat = document.getElementById('newCategory').value.trim();
-      if(newCat && !categories.includes(newCat)) {
-        categories.push(newCat);
-        saveCategories();
-        document.getElementById('newCategory').value = '';
-      }
+function saveSheetId(){
+  const raw=document.getElementById('sSheetInput').value.trim();
+  if(!raw){showToast(t('enter_table'),'warning');return;}
+  const id=extractSheetId(raw);
+  S.spreadsheetId=id; lsSet('spreadsheetId',id);
+  const hint=document.getElementById('sIdHint');
+  hint.textContent='ID: '+id; hint.style.display='block';
+  document.getElementById('no-id-banner').style.display='none';
+  S.catCache={}; save('catCache',{});
+  S.accounts=[]; save('accounts',[]); S.hiddenAccounts=[]; save('hiddenAccounts',[]);
+  S.subcats=[];  save('subcats',[]); S.hiddenSubcats=[];  save('hiddenSubcats',[]);
+  Promise.all([syncCategories('outflow'),syncCategories('inflow'),syncAccounts(),syncSubcats()])
+    .then(()=>{showToast(t('table_connected'));renderCatList();})
+    .catch(()=>showToast(t('sync_error'),'error'));
+}
+
+function saveUserName(){
+  const name=document.getElementById('sUserNameInput').value.trim();
+  S.userName=name; lsSet('userName',name);
+  showToast(t('user_name_saved'));
+}
+
+function setSettingsCatType(type){
+  S.settingsCatType=type;
+  document.getElementById('sCatOut').className='cat-seg-btn'+(type==='outflow'?' active-out':'');
+  document.getElementById('sCatIn').className ='cat-seg-btn'+(type==='inflow'?' active-in':'');
+  renderCatList();
+}
+
+function renderCatList(){
+  const type=S.settingsCatType, cats=activeCategories(type), list=document.getElementById('catList');
+  list.innerHTML='';
+  cats.forEach((cat,i)=>{
+    const row=document.createElement('div');
+    row.className='cat-item'; row.draggable=true; row.dataset.index=i;
+    row.innerHTML=`<span class="drag-handle"><i class="bi bi-grip-vertical"></i></span><span class="cat-label">${esc(cat)}</span><button class="cat-action" title="${t('rename_title')}"><i class="bi bi-pencil"></i></button><button class="cat-action" title="${t('hide_title')}"><i class="bi bi-eye-slash"></i></button>`;
+    const[btnEdit,btnHide]=row.querySelectorAll('button');
+    btnEdit.addEventListener('click',()=>editCategory(type,cat));
+    btnHide.addEventListener('click',()=>hideCategory(type,cat));
+    row.addEventListener('dragstart',()=>{row._dragging=true;row.style.opacity='.4';});
+    row.addEventListener('dragend',()=>{row.style.opacity='';row._dragging=false;list.querySelectorAll('.cat-item').forEach(r=>r.style.background='');});
+    row.addEventListener('dragover',e=>{e.preventDefault();if(!row._dragging)row.style.background='rgba(0,122,255,.06)';});
+    row.addEventListener('dragleave',()=>{row.style.background='';});
+    row.addEventListener('drop',e=>{
+      e.preventDefault();row.style.background='';
+      const dragging=list.querySelector('[style*="opacity"]');
+      if(!dragging||dragging===row)return;
+      reorderCats(type,Number(dragging.dataset.index),Number(row.dataset.index));
     });
+    list.appendChild(row);
+  });
+}
 
-    spreadsheetInput.addEventListener('input', () => {
-      localStorage.setItem('spreadsheetId', spreadsheetInput.value.trim());
-    });
+function reorderCats(type,fromI,toI){
+  const active=activeCategories(type), moved=active.splice(fromI,1)[0];
+  active.splice(toI,0,moved);
+  const hid=(S.catCache[type]||[]).filter(c=>(S.hidden[type]||[]).includes(c));
+  S.catCache[type]=[...active,...hid]; save('catCache',S.catCache); renderCatList();
+}
 
-    // Переключение страниц
-    document.getElementById('openSettings').addEventListener('click', () => {
-      document.getElementById('mainPage').style.display = 'none';
-      document.getElementById('settingsPage').style.display = 'block';
-    });
+function hideCategory(type,cat){
+  if(!S.hidden[type])S.hidden[type]=[];
+  if(!S.hidden[type].includes(cat))S.hidden[type].push(cat);
+  save('hidden',S.hidden); renderCatList(); renderCategorySelect(); renderQuickCats();
+}
 
-    document.getElementById('backToMain').addEventListener('click', () => {
-      // сохраняем id в localStorage (если изменили) и в скрытое поле формы
-      const id = (spreadsheetInput.value || '').trim();
-      localStorage.setItem('spreadsheetId', id);
-      document.getElementById('spreadsheetIdHidden').value = id;
+function restoreHidden(){
+  S.hidden={outflow:[],inflow:[]};save('hidden',S.hidden);
+  renderCatList();renderCategorySelect();renderQuickCats();showToast(t('all_restored'));
+}
 
-      // обновляем список категорий в форме (на случай изменений)
-      renderCategoriesSelect();
+async function addCategory(){
+  const input=document.getElementById('sNewCat'), name=input.value.trim(), type=S.settingsCatType;
+  if(!name)return;
+  const existing=S.catCache[type]||[];
+  const dup=existing.find(c=>c.toLowerCase()===name.toLowerCase());
+  if(dup){showToast(t('cat_exists')(dup),'warning');return;}
+  input.disabled=true;
+  if(S.spreadsheetId){
+    try{
+      const res=await apiGet({action:'addCategory',spreadsheetId:S.spreadsheetId,name,type});
+      if(res.status==='duplicate'){showToast(t('cat_exists')(res.existing),'warning');input.disabled=false;return;}
+      if(res.status!=='ok')throw new Error(res.message);
+    }catch(e){showToast(t('error_prefix')+e.message,'error');input.disabled=false;return;}
+  }
+  S.catCache[type]=[...(S.catCache[type]||[]),name];save('catCache',S.catCache);
+  input.value='';input.disabled=false;renderCatList();renderCategorySelect();showToast(t('cat_added'));
+}
 
-      document.getElementById('settingsPage').style.display = 'none';
-      document.getElementById('mainPage').style.display = 'block';
-    });
+async function editCategory(type,oldName){
+  const newName=prompt(t('rename_prompt'),oldName)?.trim();
+  if(!newName||newName===oldName)return;
+  const existing=S.catCache[type]||[];
+  const dup=existing.find(c=>c.toLowerCase()===newName.toLowerCase()&&c!==oldName);
+  if(dup){showToast(t('cat_exists')(dup),'warning');return;}
+  if(S.spreadsheetId){
+    try{
+      const res=await apiGet({action:'renameCategory',spreadsheetId:S.spreadsheetId,oldName,newName,type});
+      if(res.status==='duplicate'){showToast(t('cat_exists')(res.existing),'warning');return;}
+      if(res.status!=='ok')throw new Error(res.message);
+    }catch(e){showToast(t('error_prefix')+e.message,'error');return;}
+  }
+  const idx=existing.indexOf(oldName);
+  if(idx!==-1){existing[idx]=newName;S.catCache[type]=existing;save('catCache',S.catCache);}
+  if(S.freq[type]?.[oldName]){S.freq[type][newName]=(S.freq[type][newName]||0)+S.freq[type][oldName];delete S.freq[type][oldName];save('freq',S.freq);}
+  renderCatList();renderCategorySelect();renderQuickCats();
+}
 
-    document.getElementById('expenseForm').addEventListener('submit', (e) => {
-      const id = (spreadsheetInput.value || '').trim();
-      if (!id) {
-        showToast('Укажите ID таблицы в настройках', 'danger');
-        e.preventDefault(); // блокируем отправку, пока нет ID
-        return;
-      }
+function startApp(){
+  applyLang();
+  document.getElementById('fDate').value=todayStr();
+  renderAccountSelect();
+  renderSubcatSelect();
+  setSettingsCatType(S.settingsCatType);
 
-      // сохраняем и кладем в скрытое поле, чтобы форма послала id
-      localStorage.setItem('spreadsheetId', id);
-      document.getElementById('spreadsheetIdHidden').value = id;
+  if(S.userName) document.getElementById('sUserNameInput').value = S.userName;
 
-      submitBtn.disabled = true;
+  if(S.spreadsheetId){
+    document.getElementById('sSheetInput').value=S.spreadsheetId;
+    const hint=document.getElementById('sIdHint');
+    hint.textContent='ID: '+S.spreadsheetId; hint.style.display='block';
+  }else{document.getElementById('no-id-banner').style.display='block';}
+  setType(S.expenseType);
+  if(S.spreadsheetId){syncCategories('outflow');syncCategories('inflow');syncAccounts();syncSubcats();}
+}
 
-      // UX: показать уведомление и очистить поля после отправки (задержка)
-      setTimeout(() => {
-        showToast('Данные отправлены', 'success');
-        document.getElementById('amount').value = '';
-        document.getElementById('note').value = '';
-        submitBtn.disabled = false;
-      }, 500);
-    });
+function init(){
+  const tg=window.Telegram?.WebApp;
+  if(tg){tg.ready();tg.expand();S.tgUser=tg.initDataUnsafe?.user||null;}
+  if(!S.lang){document.getElementById('lang-picker').style.display='flex';return;}
+  startApp();
+}
 
-
-    function showToast(msg, type='success') {
-      toast.textContent = msg;
-      toast.className = 'alert alert-' + type;
-      toast.style.display = 'block';
-      setTimeout(() => toast.style.display = 'none', 2000);
-    }
-  </script>
+init();
+</script>
 </body>
 </html>
