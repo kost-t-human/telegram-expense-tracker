@@ -235,13 +235,24 @@
       </label>
     </div>
 
-    <div class="feat-row mb-4">
+    <div class="feat-row">
       <div class="feat-info">
         <div class="feat-name" data-i18n="accounts_section">Счета</div>
         <div class="feat-desc" data-i18n="accounts_desc">Учет разных кошельков и карт</div>
       </div>
       <label class="tg-switch">
         <input type="checkbox" id="iUseAccounts" checked>
+        <span class="tg-slider"></span>
+      </label>
+    </div>
+
+    <div class="feat-row mb-4">
+      <div class="feat-info">
+        <div class="feat-name" data-i18n="minus_sign">Минус для расходов</div>
+        <div class="feat-desc" data-i18n="minus_sign_desc">Записывать расходы с отрицательным знаком</div>
+      </div>
+      <label class="tg-switch">
+        <input type="checkbox" id="iMinusSign" checked>
         <span class="tg-slider"></span>
       </label>
     </div>
@@ -585,6 +596,7 @@ const S = {
   hiddenSubcats:   load('hiddenSubcats',[]),
   useSubcats:      load('useSubcats', true),
   useAccounts:     load('useAccounts', true),
+  minusSign:       load('minusSign', false),
   setupDone:       load('setupDone', false),
 };
 
