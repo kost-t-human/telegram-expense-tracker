@@ -21,6 +21,36 @@
   All API calls use doGet (query params) to avoid CORS preflight.
 */
 
+// ══════════════════════════════════════════════════════════════
+// 1. COLUMN CONFIGURATION (RECORD ORDER)
+// ══════════════════════════════════════════════════════════════
+// You can reorder these fields to change the column order in the "Records" sheet.
+// Ensure you have at least 'date', 'amount', 'category', and 'type' for the app to function correctly.
+const RECORD_COLUMNS = [
+  'timestamp',   // Row creation time
+  'date',        // Purchase date (YYYY-MM-DD)
+  'amount',      // Transaction amount
+  'category',    // Main category
+  'subcategory', // Optional subcategory
+  'description', // Note / Description
+  'account',     // Account / Wallet
+  'name',        // User name (from settings or TG)
+  'type'         // "outflow" or "inflow"
+];
+
+// Display names for the headers (you can rename these if you like)
+const COLUMN_DISPLAY_NAMES = {
+  'timestamp':   'Timestamp',
+  'date':        'Date',
+  'amount':      'Amount',
+  'category':    'Category',
+  'subcategory': 'Subcategory',
+  'description': 'Description',
+  'account':     'Account',
+  'name':        'Name',
+  'type':        'Type'
+};
+
 // ── Sheet names ────────────────────────────────────────────────
 const SH_OUTFLOWS   = 'Records';
 const SH_CATEGORIES = 'Categories';
@@ -28,23 +58,17 @@ const SH_ACCOUNTS   = 'Accounts';
 const SH_SUBCATS    = 'Subcategories';
 const SH_USERS      = 'Users';
 
-// ── Column headers ─────────────────────────────────────────────
-// Records: Timestamp · Date · Amount · Category · Subcategory · Description · Account · Name · Type
-const HDR_OUTFLOWS   = ['Timestamp','Date','Amount','Category','Subcategory','Description','Account','Name','Type'];
+// ── Derived headers ─────────────────────────────────────────────
+const HDR_OUTFLOWS   = RECORD_COLUMNS.map(key => COLUMN_DISPLAY_NAMES[key] || key);
 const HDR_CATEGORIES = ['Name','Type','Order'];
 const HDR_ACCOUNTS   = ['Name','Order'];
 const HDR_SUBCATS    = ['Name','Order'];
 const HDR_USERS      = ['Name','First name','Last name','Username','Date added'];
 
-// Row index constants for HDR_OUTFLOWS (0-based)
-const COL_DATE     = 1;
-const COL_AMOUNT   = 2;
-const COL_CAT      = 3;
-const COL_SUBCAT   = 4;
-const COL_NOTE     = 5;
-const COL_ACCOUNT  = 6;
-const COL_NAME     = 7;
-const COL_TYPE     = 8;
+// Helper to get column index by field key (0-based)
+function getColIdx(key) {
+  return RECORD_COLUMNS.indexOf(key);
+}
 
 // ── Default categories ─────────────────────────────────────────
 const DEF_OUTFLOW = [
@@ -114,9 +138,13 @@ function getOrCreateSheet(ss, name, headers) {
   if (sheet.getLastRow() === 0) {
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight('bold');
     
-    // Auto-format Date column in Records sheet (Column B)
+    // Auto-format Date column in Records sheet
     if (name === SH_OUTFLOWS) {
-      sheet.getRange('B2:B').setNumberFormat('yyyy-mm-dd');
+      const dateIdx = getColIdx('date');
+      if (dateIdx !== -1) {
+        const colLetter = String.fromCharCode(65 + dateIdx); // A, B, C...
+        sheet.getRange(`${colLetter}2:${colLetter}`).setNumberFormat('yyyy-mm-dd');
+      }
     }
   }
   return sheet;
@@ -314,8 +342,23 @@ function addRecord(ss, p) {
 
   const amount = p.amount !== undefined ? Number(p.amount) : '';
 
-  // Columns: Timestamp · Date · Amount · Category · Subcategory · Description · Account · Name · Type
-  sheet.appendRow([new Date(), purchaseDate, amount, p.category || '', subcategory, p.note || '', account, userName, type]);
+  // Prepare row data based on RECORD_COLUMNS configuration
+  const rowData = RECORD_COLUMNS.map(key => {
+    switch(key) {
+      case 'timestamp':   return new Date();
+      case 'date':        return purchaseDate;
+      case 'amount':      return amount;
+      case 'category':    return p.category || '';
+      case 'subcategory': return subcategory;
+      case 'description': return p.note || '';
+      case 'account':     return account;
+      case 'name':        return userName;
+      case 'type':        return type;
+      default:            return '';
+    }
+  });
+
+  sheet.appendRow(rowData);
   return json({ status: 'ok' });
 }
 
@@ -336,21 +379,24 @@ function checkDuplicate(ss, p) {
   const rows = sheetData(sheet, 1, HDR_OUTFLOWS.length);
   let count = 0;
 
+  const colIdxMap = {};
+  RECORD_COLUMNS.forEach((key, i) => colIdxMap[key] = i);
+
   for (const row of rows) {
-    const d = row[COL_DATE];
+    const d = row[colIdxMap['date']];
     let dateStr = '';
     if (d instanceof Date && !isNaN(d)) dateStr = Utilities.formatDate(d, tz, 'yyyy-MM-dd');
     else dateStr = String(d).substring(0, 10);
 
     if (
       dateStr === today &&
-      Number(row[COL_AMOUNT])  === amount &&
-      String(row[COL_CAT]    || '').toLowerCase()       === category &&
-      String(row[COL_SUBCAT] || '').trim().toLowerCase() === subcategory &&
-      String(row[COL_NOTE]   || '').trim().toLowerCase() === note &&
-      String(row[COL_ACCOUNT]|| '').trim().toLowerCase() === account &&
-      String(row[COL_TYPE]   || 'outflow') === type &&
-      (!userName || String(row[COL_NAME]) === userName)
+      Number(row[colIdxMap['amount']]) === amount &&
+      String(row[colIdxMap['category']] || '').toLowerCase() === category &&
+      String(row[colIdxMap['subcategory']] || '').trim().toLowerCase() === subcategory &&
+      String(row[colIdxMap['description']] || '').trim().toLowerCase() === note &&
+      String(row[colIdxMap['account']] || '').trim().toLowerCase() === account &&
+      String(row[colIdxMap['type']] || 'outflow') === type &&
+      (!userName || String(row[colIdxMap['name']]) === userName)
     ) count++;
   }
 
@@ -370,12 +416,15 @@ function getSummary(ss, period, groupBy, viewBy) {
   const rows = sheetData(sheet, 1, HDR_OUTFLOWS.length);
   const outMap = {}, inMap = {};
 
-  let colIdx = COL_CAT;
-  if (viewBy === 'subcategory') colIdx = COL_SUBCAT;
-  if (viewBy === 'account')     colIdx = COL_ACCOUNT;
+  const colIdxMap = {};
+  RECORD_COLUMNS.forEach((key, i) => colIdxMap[key] = i);
+
+  let colIdx = colIdxMap['category'];
+  if (viewBy === 'subcategory') colIdx = colIdxMap['subcategory'];
+  if (viewBy === 'account')     colIdx = colIdxMap['account'];
 
   for (const row of rows) {
-    const d = row[COL_DATE];
+    const d = row[colIdxMap['date']];
     if (!d) continue;
     let key = '';
     if (d instanceof Date && !isNaN(d))
@@ -385,9 +434,9 @@ function getSummary(ss, period, groupBy, viewBy) {
 
     if (key !== period) continue;
 
-    const amount = Number(row[COL_AMOUNT]) || 0;
+    const amount = Number(row[colIdxMap['amount']]) || 0;
     const val    = String(row[colIdx] || 'Other');
-    const type   = String(row[COL_TYPE] || 'outflow');
+    const type   = String(row[colIdxMap['type']] || 'outflow');
 
     if (type === 'inflow') inMap[val]  = (inMap[val]  || 0) + amount;
     else                   outMap[val] = (outMap[val] || 0) + amount;
@@ -399,3 +448,4 @@ function getSummary(ss, period, groupBy, viewBy) {
 
   return json({ status: 'ok', period, groupBy, viewBy, outflows: sorted(outMap), income: sorted(inMap) });
 }
+

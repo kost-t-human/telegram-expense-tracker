@@ -161,12 +161,26 @@
     .lang-pick-btn:active { transform: scale(.97); }
 
     /* User name prompt overlay */
-    #user-name-prompt { position: fixed; inset: 0; z-index: 9998; background: var(--bg); display: none; flex-direction: column; align-items: center; justify-content: center; gap: 20px; padding: 32px; }
-    .un-prompt-card { width: 100%; max-width: 320px; background: var(--surface); border-radius: var(--r-lg); box-shadow: var(--sh-lg); padding: 24px; text-align: center; }
+    #user-name-prompt, #features-prompt, #sheet-id-prompt { position: fixed; inset: 0; z-index: 9998; background: var(--bg); display: none; flex-direction: column; align-items: center; justify-content: center; gap: 20px; padding: 32px; overflow-y: auto; }
+    .un-prompt-card { width: 100%; max-width: 340px; background: var(--surface); border-radius: var(--r-lg); box-shadow: var(--sh-lg); padding: 24px; text-align: center; }
     .un-prompt-title { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
     .un-prompt-text { font-size: 14px; color: var(--hint); margin-bottom: 20px; }
     .un-input { width: 100%; border: 1.5px solid var(--border); border-radius: var(--r); padding: 12px 14px; font-size: 15px; background: var(--surface); color: var(--text); outline: none; transition: border-color .15s; margin-bottom: 20px; text-align: center; }
     .un-input:focus { border-color: var(--acc); }
+
+    /* Switches */
+    .tg-switch { position: relative; display: inline-block; width: 46px; height: 26px; }
+    .tg-switch input { opacity: 0; width: 0; height: 0; }
+    .tg-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(120,120,128,.16); transition: .3s; border-radius: 34px; }
+    .tg-slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px; background-color: white; transition: .3s; border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,.15); }
+    input:checked + .tg-slider { background-color: var(--in); }
+    input:checked + .tg-slider:before { transform: translateX(20px); }
+
+    .feat-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border); text-align: left; }
+    .feat-row:last-child { border-bottom: none; }
+    .feat-info { flex: 1; padding-right: 12px; }
+    .feat-name { font-size: 15px; font-weight: 600; }
+    .feat-desc { font-size: 12px; color: var(--hint); }
 
     /* Modal */
     .modal-content { border: none !important; border-radius: var(--r-lg) !important; box-shadow: var(--sh-lg) !important; background: var(--surface) !important; }
@@ -201,7 +215,49 @@
     <input type="text" id="iUserNameInput" class="un-input" 
            data-i18n-placeholder="user_name_placeholder"
            placeholder="Ваше имя">
-    <button class="submit-btn out" onclick="finishSetup()" data-i18n="save">Сохранить</button>
+    <button class="submit-btn out" onclick="setupStep(2)" data-i18n="next">Далее</button>
+  </div>
+</div>
+
+<div id="features-prompt">
+  <div class="un-prompt-card">
+    <div class="un-prompt-title" data-i18n="onboarding_features_title">Возможности</div>
+    <div class="un-prompt-text" data-i18n="onboarding_features_text">Выберите, какие поля использовать. Вы сможете изменить это позже.</div>
+    
+    <div class="feat-row">
+      <div class="feat-info">
+        <div class="feat-name" data-i18n="subcats_section">Подкатегории</div>
+        <div class="feat-desc" data-i18n="subcats_desc">Дополнительная детализация расходов</div>
+      </div>
+      <label class="tg-switch">
+        <input type="checkbox" id="iUseSubcats" checked>
+        <span class="tg-slider"></span>
+      </label>
+    </div>
+
+    <div class="feat-row mb-4">
+      <div class="feat-info">
+        <div class="feat-name" data-i18n="accounts_section">Счета</div>
+        <div class="feat-desc" data-i18n="accounts_desc">Учет разных кошельков и карт</div>
+      </div>
+      <label class="tg-switch">
+        <input type="checkbox" id="iUseAccounts" checked>
+        <span class="tg-slider"></span>
+      </label>
+    </div>
+
+    <button class="submit-btn out" onclick="setupStep(3)" data-i18n="next">Далее</button>
+  </div>
+</div>
+
+<div id="sheet-id-prompt">
+  <div class="un-prompt-card">
+    <div class="un-prompt-title" data-i18n="google_table">Таблица Google Sheets</div>
+    <div class="un-prompt-text" data-i18n="onboarding_sheet_text">Введите ссылку или ID таблицы для синхронизации данных.</div>
+    <input type="text" id="iSheetIdInput" class="un-input" 
+           data-i18n-placeholder="table_placeholder"
+           placeholder="Ссылка или ID таблицы">
+    <button class="submit-btn out" onclick="setupStep(4)" data-i18n="save">Сохранить</button>
   </div>
 </div>
 
@@ -240,7 +296,7 @@
         <i class="bi bi-chevron-right si"></i>
       </div>
 
-      <div class="frow">
+      <div class="frow" id="fSubcategoryWrap">
         <label class="frow-lbl" for="fSubcategory">
           <span data-i18n="subcategory">Подкатегория</span>
           <span class="opt-badge" data-i18n="optional_badge">опц.</span>
@@ -254,7 +310,7 @@
         <input type="number" id="fAmount" placeholder="0" min="0" step="any" inputmode="decimal">
       </div>
 
-      <div class="frow">
+      <div class="frow" id="fAccountWrap">
         <label class="frow-lbl" for="fAccount">
           <span data-i18n="account">Счёт</span>
           <span class="opt-badge" data-i18n="optional_badge">опц.</span>
@@ -366,37 +422,72 @@
       Удаление скрывает категорию только локально — из таблицы не удаляется
     </p>
 
-    <div class="sec-hdr mt-3" data-i18n="accounts_section">Счета</div>
-    <div class="new-cat-row">
-      <input type="text" id="sNewAccount" class="new-cat-input"
-             data-i18n-placeholder="new_account_placeholder"
-             placeholder="Новый счёт…"
-             onkeydown="if(event.key==='Enter') addListItem('accounts')">
-      <button class="new-cat-add" onclick="addListItem('accounts')">
-        <i class="bi bi-plus-lg"></i>
-      </button>
+    <div class="sec-hdr" data-i18n="app_features">Функции приложения</div>
+    <div class="s-section p-3">
+      <div class="feat-row">
+        <div class="feat-info">
+          <div class="feat-name" data-i18n="subcats_section">Подкатегории</div>
+        </div>
+        <label class="tg-switch">
+          <input type="checkbox" id="sUseSubcats" onchange="toggleFeature('useSubcats', this.checked)">
+          <span class="tg-slider"></span>
+        </label>
+      </div>
+      <div class="feat-row">
+        <div class="feat-info">
+          <div class="feat-name" data-i18n="accounts_section">Счета</div>
+        </div>
+        <label class="tg-switch">
+          <input type="checkbox" id="sUseAccounts" onchange="toggleFeature('useAccounts', this.checked)">
+          <span class="tg-slider"></span>
+        </label>
+      </div>
+      <div class="feat-row">
+        <div class="feat-info">
+          <div class="feat-name" data-i18n="minus_sign">Минус для расходов</div>
+        </div>
+        <label class="tg-switch">
+          <input type="checkbox" id="sMinusSign" onchange="toggleFeature('minusSign', this.checked)">
+          <span class="tg-slider"></span>
+        </label>
+      </div>
     </div>
-    <div id="accountSettingsList" class="cat-list mb-3"></div>
-    <button class="s-btn mb-1" onclick="restoreHiddenAccounts()">
-      <i class="bi bi-eye"></i>
-      <span data-i18n="accounts_restored">Восстановить скрытые счета</span>
-    </button>
 
-    <div class="sec-hdr mt-3" data-i18n="subcats_section">Подкатегории</div>
-    <div class="new-cat-row">
-      <input type="text" id="sNewSubcat" class="new-cat-input"
-             data-i18n-placeholder="new_subcat_placeholder"
-             placeholder="Новая подкатегория…"
-             onkeydown="if(event.key==='Enter') addListItem('subcats')">
-      <button class="new-cat-add" onclick="addListItem('subcats')">
-        <i class="bi bi-plus-lg"></i>
+    <div id="settings-subcats-wrap">
+      <div class="sec-hdr mt-3" data-i18n="subcats_section">Подкатегории</div>
+      <div class="new-cat-row">
+        <input type="text" id="sNewSubcat" class="new-cat-input"
+               data-i18n-placeholder="new_subcat_placeholder"
+               placeholder="Новая подкатегория…"
+               onkeydown="if(event.key==='Enter') addListItem('subcats')">
+        <button class="new-cat-add" onclick="addListItem('subcats')">
+          <i class="bi bi-plus-lg"></i>
+        </button>
+      </div>
+      <div id="subcatSettingsList" class="cat-list mb-3"></div>
+      <button class="s-btn mb-1" onclick="restoreHiddenSubcats()">
+        <i class="bi bi-eye"></i>
+        <span data-i18n="subcats_restored">Восстановить скрытые подкатегории</span>
       </button>
     </div>
-    <div id="subcatSettingsList" class="cat-list mb-3"></div>
-    <button class="s-btn mb-1" onclick="restoreHiddenSubcats()">
-      <i class="bi bi-eye"></i>
-      <span data-i18n="subcats_restored">Восстановить скрытые подкатегории</span>
-    </button>
+
+    <div id="settings-accounts-wrap">
+      <div class="sec-hdr mt-3" data-i18n="accounts_section">Счета</div>
+      <div class="new-cat-row">
+        <input type="text" id="sNewAccount" class="new-cat-input"
+               data-i18n-placeholder="new_account_placeholder"
+               placeholder="Новый счёт…"
+               onkeydown="if(event.key==='Enter') addListItem('accounts')">
+        <button class="new-cat-add" onclick="addListItem('accounts')">
+          <i class="bi bi-plus-lg"></i>
+        </button>
+      </div>
+      <div id="accountSettingsList" class="cat-list mb-3"></div>
+      <button class="s-btn mb-1" onclick="restoreHiddenAccounts()">
+        <i class="bi bi-eye"></i>
+        <span data-i18n="accounts_restored">Восстановить скрытые счета</span>
+      </button>
+    </div>
 
     <div class="sec-hdr mt-3" data-i18n="language">Язык</div>
     <div class="lang-seg">
@@ -422,7 +513,19 @@
 </nav>
 
 <div class="modal fade" id="dupModal" tabindex="-1">
-...
+  <div class="modal-dialog modal-dialog-centered mx-3">
+    <div class="modal-content">
+      <div class="modal-body p-4 text-center">
+        <div class="mb-3"><i class="bi bi-exclamation-triangle-fill text-warning" style="font-size:48px"></i></div>
+        <h5 class="fw-bold mb-2" data-i18n="possible_dup">Возможный дубль</h5>
+        <p class="text-muted mb-4" data-i18n="dup_text">Сегодня уже есть запись с такими же параметрами. Внести ещё раз?</p>
+        <div class="d-flex gap-2">
+          <button class="submit-btn flex-fill bg-light text-dark shadow-none" data-bs-dismiss="modal" data-i18n="cancel">Отмена</button>
+          <button id="dupConfirmBtn" class="submit-btn flex-fill out shadow-none" data-i18n="yes_add">Да, внести</button>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div class="modal fade" id="periodModal" tabindex="-1">
@@ -449,132 +552,19 @@
   <div id="toast-box"></div>
 </div>
 
+<script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 // ════════════════════════════════════════════════════════════════
-//  CONFIGURATION — вставьте URL Google Apps Script
+//  CONFIGURATION — moved to config.js
 // ════════════════════════════════════════════════════════════════
-const GAS_URL = 'YOUR_GAS_SCRIPT_URL_HERE';
-const APP_ID = 'rasshody'; // unique prefix — change per bot deployment
 
 const DEF_OUTFLOW_CATS = ['Other'];
 const DEF_INFLOW_CATS  = ['Other'];
 
-const LANG = {
-  ru: {
-    nav_record:'Запись', nav_summary:'Сводка', nav_settings:'Настройки',
-    expense:'Расход', inflow:'Доход',
-    date:'Дата', category:'Категория', subcategory:'Подкатегория', account:'Счёт',
-    amount:'Сумма', description:'Описание', optional:'Необязательно', optional_badge:'опц.',
-    save:'Сохранить', month:'Месяц', year:'Год', prev:'Предыд.', current:'Текущий',
-    no_records:'Нет записей за этот период', setup_table:'Настройте таблицу в ⚙ Настройках',
-    expenses_title:'Расходы', inflow_title:'Доходы', balance:'Баланс', no_data:'Нет данных',
-    google_table:'Таблица Google Sheets', table_placeholder:'Ссылка или ID таблицы',
-    save_sync:'Сохранить и синхронизировать', categories:'Категории',
-    expenses_cat:'Расходы', inflow_cat:'Доходы', new_cat_placeholder:'Новая категория…',
-    restore_hidden:'Восстановить скрытые',
-    delete_hint:'Удаление скрывает категорию только локально — из таблицы не удаляется',
-    language:'Язык', banner:'Укажите ссылку на таблицу в <strong>⚙ Настройках</strong>',
-    fill_required:'Заполните дату, категорию и сумму',
-    set_table_warn:'Укажите ссылку на таблицу в Настройках',
-    table_connected:'Таблица подключена, категории синхронизированы',
-    sync_error:'Ошибка синхронизации', enter_table:'Введите ссылку или ID таблицы',
-    expense_saved:'Расход сохранён ✓', inflow_saved:'Доход сохранён ✓', error_prefix:'Ошибка: ',
-    cat_exists:(n)=>`Категория уже есть: «${n}»`, cat_added:'Категория добавлена',
-    all_restored:'Все категории восстановлены', possible_dup:'Возможный дубль',
-    dup_text:'Сегодня уже есть запись с такими же параметрами. Внести ещё раз?',
-    cancel:'Отмена', yes_add:'Да, внести', hide_title:'Скрыть', rename_title:'Переименовать',
-    rename_prompt:'Новое название:',
-    accounts_section:'Счета', subcats_section:'Подкатегории',
-    new_account_placeholder:'Новый счёт…', new_subcat_placeholder:'Новая подкатегория…',
-    account_added:'Счёт добавлен', subcat_added:'Подкатегория добавлена',
-    item_exists:(n)=>`Уже есть: «${n}»`,
-    accounts_restored:'Скрытые счета восстановлены', subcats_restored:'Скрытые подкатегории восстановлены',
-    no_account:'— не выбрано —', no_subcat:'— не выбрано —',
-    user_profile:'Профиль пользователя', user_name_placeholder:'Ваше имя (для записей)',
-    save_user_name:'Сохранить имя', user_name_saved:'Имя сохранено',
-    setup_user_name_text:'Представьтесь, пожалуйста, для ведения учета',
-    year_format:(y)=>`${y} год`, month_format:(mon,y)=>`${mon} ${y}`,
-    months:['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'],
-    select_period:'Выбор периода',
-  },
-  en: {
-    nav_record:'Record', nav_summary:'Summary', nav_settings:'Settings',
-    expense:'Outflow', inflow:'Inflow',
-    date:'Date', category:'Category', subcategory:'Subcategory', account:'Account',
-    amount:'Amount', description:'Note', optional:'Optional', optional_badge:'opt.',
-    save:'Save', month:'Month', year:'Year', prev:'Prev.', current:'Current',
-    no_records:'No records for this period', setup_table:'Set up your table in ⚙ Settings',
-    expenses_title:'Outflow', inflow_title:'Inflow', balance:'Balance', no_data:'No data',
-    google_table:'Google Sheets Table', table_placeholder:'Link or Table ID',
-    save_sync:'Save and sync', categories:'Categories',
-    expenses_cat:'Outflow', inflow_cat:'Inflow', new_cat_placeholder:'New category…',
-    restore_hidden:'Restore hidden',
-    delete_hint:'Hiding a category only hides it locally — not deleted from the spreadsheet',
-    language:'Language', banner:'Set up your spreadsheet in <strong>⚙ Settings</strong>',
-    fill_required:'Please fill in date, category and amount',
-    set_table_warn:'Set up your spreadsheet in Settings',
-    table_connected:'Table connected, categories synced',
-    sync_error:'Sync error', enter_table:'Enter a link or Table ID',
-    expense_saved:'Outflow saved ✓', inflow_saved:'Inflow saved ✓', error_prefix:'Error: ',
-    cat_exists:(n)=>`Category already exists: «${n}»`, cat_added:'Category added',
-    all_restored:'All categories restored', possible_dup:'Possible duplicate',
-    dup_text:'There is already a record today with the same parameters. Add again?',
-    cancel:'Cancel', yes_add:'Yes, add', hide_title:'Hide', rename_title:'Rename',
-    rename_prompt:'New name:',
-    accounts_section:'Accounts', subcats_section:'Subcategories',
-    new_account_placeholder:'New account…', new_subcat_placeholder:'New subcategory…',
-    account_added:'Account added', subcat_added:'Subcategory added',
-    item_exists:(n)=>`Already exists: «${n}»`,
-    accounts_restored:'Hidden accounts restored', subcats_restored:'Hidden subcategories restored',
-    no_account:'— none —', no_subcat:'— none —',
-    user_profile:'User Profile', user_name_placeholder:'Your name (for records)',
-    save_user_name:'Save Name', user_name_saved:'Name saved',
-    setup_user_name_text:'Please introduce yourself to start tracking',
-    year_format:(y)=>String(y), month_format:(mon,y)=>`${mon} ${y}`,
-    months:['January','February','March','April','May','June','July','August','September','October','November','December'],
-    select_period:'Select Period',
-  },
-  vi: {
-    nav_record:'Ghi chép', nav_summary:'Tổng quan', nav_settings:'Cài đặt',
-    expense:'Chi tiêu', inflow:'Thu nhập',
-    date:'Ngày', category:'Danh mục', subcategory:'Danh mục phụ', account:'Tài khoản',
-    amount:'Số tiền', description:'Ghi chú', optional:'Không bắt buộc', optional_badge:'tùy chọn',
-    save:'Lưu', month:'Tháng', year:'Năm', prev:'Trước', current:'Hiện tại',
-    no_records:'Không có dữ liệu cho kỳ này', setup_table:'Thiết lập bảng tính trong ⚙ Cài đặt',
-    expenses_title:'Khoản chi', inflow_title:'Khoản thu', balance:'Số dư', no_data:'Không có dữ liệu',
-    google_table:'Bảng tính Google Sheets', table_placeholder:'Liên kết hoặc ID bảng tính',
-    save_sync:'Lưu và đồng bộ', categories:'Danh mục',
-    expenses_cat:'Chi tiêu', inflow_cat:'Thu nhập', new_cat_placeholder:'Danh mục mới…',
-    restore_hidden:'Khôi phục đã ẩn',
-    delete_hint:'Ẩn danh mục chỉ ẩn trên thiết bị này — không xóa khỏi bảng tính',
-    language:'Ngôn ngữ', banner:'Thiết lập bảng tính trong <strong>⚙ Cài đặt</strong>',
-    fill_required:'Vui lòng nhập ngày, danh mục và số tiền',
-    set_table_warn:'Thiết lập bảng tính trong Cài đặt',
-    table_connected:'Đã kết nối bảng tính, danh mục đã đồng bộ',
-    sync_error:'Lỗi đồng bộ', enter_table:'Nhập liên kết hoặc ID bảng tính',
-    expense_saved:'Đã lưu khoản chi ✓', inflow_saved:'Đã lưu khoản thu ✓', error_prefix:'Lỗi: ',
-    cat_exists:(n)=>`Danh mục đã tồn tại: «${n}»`, cat_added:'Đã thêm danh mục',
-    all_restored:'Đã khôi phục tất cả danh mục', possible_dup:'Có thể trùng lặp',
-    dup_text:'Đã có một bản ghi tương tự trong hôm nay. Bạn vẫn muốn thêm chứ?',
-    cancel:'Hủy', yes_add:'Đồng ý', hide_title:'Ẩn', rename_title:'Đổi tên',
-    rename_prompt:'Tên mới:',
-    accounts_section:'Tài khoản', subcats_section:'Danh mục phụ',
-    new_account_placeholder:'Tài khoản mới…', new_subcat_placeholder:'Danh mục phụ mới…',
-    account_added:'Đã thêm tài khoản', subcat_added:'Đã thêm danh mục phụ',
-    item_exists:(n)=>`Đã tồn tại: «${n}»`,
-    accounts_restored:'Đã khôi phục tài khoản ẩn', subcats_restored:'Đã khôi phục danh mục phụ ẩn',
-    no_account:'— chưa chọn —', no_subcat:'— chưa chọn —',
-    user_profile:'Hồ sơ người dùng', user_name_placeholder:'Nhập tên của bạn…',
-    save_user_name:'Lưu thông tin', user_name_saved:'Đã cập nhật tên',
-    setup_user_name_text:'Vui lòng nhập tên của bạn để bắt đầu sử dụng',
-    year_format:(y)=>`Năm ${y}`, month_format:(mon,y)=>`${mon} năm ${y}`,
-    months:['Tháng 1','Tháng 2','Tháng 3','Tháng 4','Tháng 5','Tháng 6','Tháng 7','Tháng 8','Tháng 9','Tháng 10','Tháng 11','Tháng 12'],
-    select_period:'Chọn khoảng thời gian',
-  },
-};
+let DICT = {}; // Current language dictionary
 
-function t(key) { return (LANG[S.lang]??LANG.en)[key]??LANG.en[key]??key; }
+function t(key) { return DICT[key]??key; }
 
 const S = {
   spreadsheetId: lsGet('spreadsheetId'),
@@ -593,6 +583,9 @@ const S = {
   hiddenAccounts:  load('hiddenAccounts',[]),
   subcats:         load('subcats',[]),
   hiddenSubcats:   load('hiddenSubcats',[]),
+  useSubcats:      load('useSubcats', true),
+  useAccounts:     load('useAccounts', true),
+  setupDone:       load('setupDone', false),
 };
 
 // Migrate old expense/inflow key names from v1
@@ -612,7 +605,17 @@ function lsSet(k,v){localStorage.setItem(APP_ID+':'+k,v);}
 function load(key,def){try{return JSON.parse(lsGet(key,'null'))||def;}catch{return def;}}
 function save(key,val){lsSet(key,JSON.stringify(val));}
 
-function applyLang(){
+async function fetchDictionary(lang) {
+  if (!lang) return;
+  try {
+    const r = await fetch(`lang/${lang}.json`);
+    DICT = await r.json();
+  } catch (e) {
+    console.error('Failed to load language', lang, e);
+  }
+}
+
+async function applyLang(){
   document.documentElement.lang=S.lang||'en';
   document.querySelectorAll('[data-i18n]').forEach(el=>{const v=t(el.dataset.i18n);if(typeof v==='string')el.textContent=v;});
   document.querySelectorAll('[data-i18n-html]').forEach(el=>{const v=t(el.dataset.i18nHtml);if(typeof v==='string')el.innerHTML=v;});
@@ -627,27 +630,81 @@ function updateLangButtons(){
   ['ru','en','vi'].forEach(c=>{const b=document.getElementById('lang'+c[0].toUpperCase()+c.slice(1));if(b)b.className='lang-btn'+(S.lang===c?' active':'');});
 }
 
-function setLang(lang){
-  const first=!S.lang;
+async function setLang(lang){
   S.lang=lang; lsSet('lang',lang);
   document.getElementById('lang-picker').style.display='none';
-  if(first){
-    applyLang();
+  await fetchDictionary(lang);
+  applyLang();
+  if(!S.setupDone){
     if(S.tgUser){
       const name = [S.tgUser.first_name, S.tgUser.last_name].filter(Boolean).join(' ') || S.tgUser.username;
       if(name) document.getElementById('iUserNameInput').value = name;
     }
     document.getElementById('user-name-prompt').style.display='flex';
-  } else {
-    applyLang();
   }
 }
 
-function finishSetup(){
-  const name=document.getElementById('iUserNameInput').value.trim();
-  if(name){ S.userName=name; lsSet('userName',name); }
-  document.getElementById('user-name-prompt').style.display='none';
-  startApp();
+function setupStep(step){
+  if(step === 2){
+    const name=document.getElementById('iUserNameInput').value.trim();
+    if(!name) return;
+    S.userName=name; lsSet('userName',name);
+    document.getElementById('user-name-prompt').style.display='none';
+    document.getElementById('features-prompt').style.display='flex';
+  } else if(step === 3){
+    S.useSubcats = document.getElementById('iUseSubcats').checked;
+    S.useAccounts = document.getElementById('iUseAccounts').checked;
+    S.minusSign = document.getElementById('iMinusSign').checked;
+    save('useSubcats', S.useSubcats);
+    save('useAccounts', S.useAccounts);
+    save('minusSign', S.minusSign);
+    document.getElementById('features-prompt').style.display='none';
+    document.getElementById('sheet-id-prompt').style.display='flex';
+  } else if(step === 4){
+    const raw = document.getElementById('iSheetIdInput').value.trim();
+    if(!raw) return;
+    const id = extractSheetId(raw);
+    S.spreadsheetId = id; lsSet('spreadsheetId', id);
+    S.setupDone = true; save('setupDone', true);
+    document.getElementById('sheet-id-prompt').style.display='none';
+    startApp();
+    showToast(t('table_connected'));
+  }
+}
+
+function toggleFeature(key, val){
+  S[key] = val;
+  save(key, val);
+  applyFeatures();
+}
+
+function applyFeatures(){
+  const sSub = document.getElementById('settings-subcats-wrap');
+  const sAcc = document.getElementById('settings-accounts-wrap');
+  const fSub = document.getElementById('fSubcategoryWrap');
+  const fAcc = document.getElementById('fAccountWrap');
+  
+  if(sSub) sSub.style.display = S.useSubcats ? 'block' : 'none';
+  if(sAcc) sAcc.style.display = S.useAccounts ? 'block' : 'none';
+  if(fSub) fSub.style.display = S.useSubcats ? 'flex' : 'none';
+  if(fAcc) fAcc.style.display = S.useAccounts ? 'flex' : 'none';
+
+  // Sync switches in settings
+  const swSub = document.getElementById('sUseSubcats');
+  const swAcc = document.getElementById('sUseAccounts');
+  const swMinus = document.getElementById('sMinusSign');
+  if(swSub) swSub.checked = S.useSubcats;
+  if(swAcc) swAcc.checked = S.useAccounts;
+  if(swMinus) swMinus.checked = S.minusSign;
+
+  // Sync summary views
+  const vSub = document.getElementById('viewSubcategory');
+  const vAcc = document.getElementById('viewAccount');
+  if(vSub) vSub.style.display = S.useSubcats ? 'block' : 'none';
+  if(vAcc) vAcc.style.display = S.useAccounts ? 'block' : 'none';
+  
+  if(!S.useSubcats && S.summaryView === 'subcategory') setSummaryView('category');
+  if(!S.useAccounts && S.summaryView === 'account') setSummaryView('category');
 }
 
 function extractSheetId(s){const m=s.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);return m?m[1]:s.trim();}
@@ -683,9 +740,11 @@ function nextPeriod(p,mode){
   return m===12?`${y+1}-01`:`${y}-${String(m+1).padStart(2,'0')}`;
 }
 function periodLabel(p,mode){
-  if(mode==='year')return t('year_format')(Number(p));
-  const mons=t('months');const[y,m]=p.split('-').map(Number);
-  return t('month_format')(mons[m-1],y);
+  if(mode==='year')return t('year_format_val') ? t('year_format_val').replace('{y}', p) : p;
+  const mons = [t('mon_1'),t('mon_2'),t('mon_3'),t('mon_4'),t('mon_5'),t('mon_6'),t('mon_7'),t('mon_8'),t('mon_9'),t('mon_10'),t('mon_11'),t('mon_12')];
+  const[y,m]=p.split('-').map(Number);
+  const mon = mons[m-1];
+  return t('month_format_val') ? t('month_format_val').replace('{m}', mon).replace('{y}', y) : `${mon} ${y}`;
 }
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
@@ -988,7 +1047,11 @@ function confirmDuplicate(){
 }
 
 async function doSave(date,category,subcategory,amount,account,note){
-  const res=await apiGet({action:'addRecord',spreadsheetId:S.spreadsheetId,date,category,subcategory,amount,account,note,type:S.expenseType,firstName:S.tgUser?.first_name||'',lastName:S.tgUser?.last_name||'',username:S.tgUser?.username||'',userName:S.userName||''});
+  let finalAmount = amount;
+  if(S.minusSign && S.expenseType === 'outflow') {
+    finalAmount = -Math.abs(amount);
+  }
+  const res=await apiGet({action:'addRecord',spreadsheetId:S.spreadsheetId,date,category,subcategory,amount:finalAmount,account,note,type:S.expenseType,firstName:S.tgUser?.first_name||'',lastName:S.tgUser?.last_name||'',username:S.tgUser?.username||'',userName:S.userName||''});
   if(res.status!=='ok')throw new Error(res.message||'Server error');
 }
 
@@ -1024,7 +1087,8 @@ function renderPeriodPicker(){
     yearLabel.textContent = _pickerYear;
     const currentM = S.summaryPeriod.split('-')[1];
     const currentY = S.summaryPeriod.split('-')[0];
-    monthGrid.innerHTML = t('months').map((mon, i) => {
+    const mons = [t('mon_1'),t('mon_2'),t('mon_3'),t('mon_4'),t('mon_5'),t('mon_6'),t('mon_7'),t('mon_8'),t('mon_9'),t('mon_10'),t('mon_11'),t('mon_12')];
+    monthGrid.innerHTML = mons.map((mon, i) => {
       const monthNum = String(i+1).padStart(2, '0');
       const active = (currentY == _pickerYear && currentM == monthNum) ? 'active' : '';
       return `<button class="month-btn ${active}" onclick="selectPickerMonth(${i+1})">${mon}</button>`;
@@ -1039,7 +1103,8 @@ function renderPeriodPicker(){
     for(let i=0; i<10; i++) years.push(startY - i);
     yearList.innerHTML = years.map(y => {
       const active = (currentY == y) ? 'active' : '';
-      return `<button class="year-btn ${active}" onclick="selectPickerYear(${y})">${t('year_format')(y)}</button>`;
+      const label = t('year_format_val') ? t('year_format_val').replace('{y}', y) : y;
+      return `<button class="year-btn ${active}" onclick="selectPickerYear(${y})">${label}</button>`;
     }).join('');
   }
 }
@@ -1071,13 +1136,14 @@ async function loadSummary(){
 function renderSummaryData(data){
   const expenses=data.outflows||data.expenses||[], inflow=data.income||data.inflow||[];
   const totExp=expenses.reduce((s,i)=>s+i.total,0), totInc=inflow.reduce((s,i)=>s+i.total,0);
-  const balance=totInc-totExp;
+  const balance = S.minusSign ? (totInc + totExp) : (totInc - totExp);
   if(!expenses.length&&!inflow.length){document.getElementById('summaryContent').innerHTML=`<div class="text-center text-muted py-5">${t('no_records')}</div>`;return;}
 
   const section=(items,total,col,lkey,icon)=>{
     if(!items.length)return'';
     const rows=items.map(item=>{
-      const pct=total>0?Math.round(item.total/total*100):0;
+      const absTotal = Math.abs(total);
+      const pct=absTotal>0?Math.round(Math.abs(item.total)/absTotal*100):0;
       const label = item.label || item.category || 'Other';
       return`<div class="sum-row"><div class="sum-row-info"><div class="sum-row-name" title="${esc(label)}">${esc(label)}</div><div class="sum-bar"><div class="sum-bar-fill" style="width:${pct}%;background:${col}"></div></div></div><div class="sum-row-right"><span class="sum-row-amt" style="color:${col}">${formatMoney(item.total)}</span><span class="sum-row-pct">${pct}%</span></div></div>`;
     }).join('');
@@ -1205,6 +1271,7 @@ function startApp(){
   renderAccountSelect();
   renderSubcatSelect();
   setSettingsCatType(S.settingsCatType);
+  applyFeatures();
 
   if(S.userName) document.getElementById('sUserNameInput').value = S.userName;
 
@@ -1217,10 +1284,31 @@ function startApp(){
   if(S.spreadsheetId){syncCategories('outflow');syncCategories('inflow');syncAccounts();syncSubcats();}
 }
 
-function init(){
+async function init(){
   const tg=window.Telegram?.WebApp;
   if(tg){tg.ready();tg.expand();S.tgUser=tg.initDataUnsafe?.user||null;}
   if(!S.lang){document.getElementById('lang-picker').style.display='flex';return;}
+  await fetchDictionary(S.lang);
+  if(!S.setupDone){
+    if(S.tgUser){
+      const name = [S.tgUser.first_name, S.tgUser.last_name].filter(Boolean).join(' ') || S.tgUser.username;
+      if(name) document.getElementById('iUserNameInput').value = name;
+    }
+    document.getElementById('user-name-prompt').style.display='flex';
+    applyLang();
+    return;
+  }
+  startApp();
+}
+
+init();
+</script>
+</body>
+</html>
+x';
+    applyLang();
+    return;
+  }
   startApp();
 }
 
