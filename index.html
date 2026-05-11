@@ -70,10 +70,15 @@
     .amt-cur { font-size: 18px; font-weight: 600; color: var(--hint); }
 
     /* Submit button */
-    .submit-btn { width: 100%; border: none; border-radius: var(--r-lg); padding: 15px; font-size: 16px; font-weight: 700; cursor: pointer; transition: all .2s var(--ease); letter-spacing: .2px; }
-    .submit-btn:active { transform: scale(.97); }
+    .submit-btn { width: 100%; border: none; border-radius: var(--r-lg); padding: 15px; font-size: 16px; font-weight: 700; cursor: pointer; transition: all .2s var(--ease); letter-spacing: .2px; display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .submit-btn:active:not(:disabled) { transform: scale(.97); }
     .submit-btn.out { background: var(--out); color: #fff; box-shadow: 0 4px 18px var(--out-glow); }
     .submit-btn.in  { background: var(--in);  color: #fff; box-shadow: 0 4px 18px var(--in-glow); }
+    .submit-btn:disabled { opacity: .72; cursor: not-allowed; transform: none; }
+    .submit-btn .btn-spinner { width: 18px; height: 18px; border: 2.5px solid rgba(255,255,255,.4); border-top-color: #fff; border-radius: 50%; animation: btn-spin .65s linear infinite; flex-shrink: 0; display: none; }
+    .submit-btn.loading .btn-spinner { display: block; }
+    .submit-btn.loading .btn-label { opacity: .85; }
+    @keyframes btn-spin { to { transform: rotate(360deg); } }
 
     /* Bottom nav */
     #bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: var(--surface); border-top: 1px solid var(--border); display: flex; padding-bottom: env(safe-area-inset-bottom, 0); z-index: 1000; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
@@ -270,7 +275,8 @@
     </div>
 
     <button id="submitBtn" class="submit-btn out" onclick="submitForm()">
-      <span data-i18n="save">Сохранить</span>
+      <span class="btn-spinner"></span>
+      <span class="btn-label" data-i18n="save">Сохранить</span>
     </button>
   </div>
 
@@ -943,10 +949,15 @@ async function submitForm(){
 
   const btn=document.getElementById('submitBtn');
   btn.disabled=true;
+  btn.classList.add('loading');
   try{
     if(date===todayStr()){
       const dup=await apiGet({action:'checkDuplicate',spreadsheetId:S.spreadsheetId,date,amount,category,subcategory,note,account,userName:S.userName||'',type:S.expenseType});
-      if(dup.duplicate){btn.disabled=false;try{await confirmDuplicate();}catch{return;}btn.disabled=true;}
+      if(dup.duplicate){
+        btn.disabled=false;btn.classList.remove('loading');
+        try{await confirmDuplicate();}catch{return;}
+        btn.disabled=true;btn.classList.add('loading');
+      }
     }
     await doSave(date,category,subcategory,amount,account,note);
     if(!S.freq[S.expenseType])S.freq[S.expenseType]={};
@@ -959,7 +970,7 @@ async function submitForm(){
     renderQuickCats();
     showToast(S.expenseType==='outflow'?t('expense_saved'):t('inflow_saved'));
   }catch(e){showToast(t('error_prefix')+e.message,'error');}
-  finally{btn.disabled=false;}
+  finally{btn.disabled=false;btn.classList.remove('loading');}
 }
 
 function confirmDuplicate(){
