@@ -390,7 +390,7 @@ function checkDuplicate(ss, p) {
 
     if (
       dateStr === today &&
-      Number(row[colIdxMap['amount']]) === amount &&
+      Math.abs(Number(row[colIdxMap['amount']])) === Math.abs(amount) &&
       String(row[colIdxMap['category']] || '').toLowerCase() === category &&
       String(row[colIdxMap['subcategory']] || '').trim().toLowerCase() === subcategory &&
       String(row[colIdxMap['description']] || '').trim().toLowerCase() === note &&

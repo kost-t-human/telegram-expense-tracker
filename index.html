@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Finance Tracker</title>
-  <script>try{window.Telegram?.WebApp?.expand();}catch(e){}</script>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
   <style>
@@ -31,11 +31,11 @@
     *, *::before, *::after { box-sizing: border-box; }
     html {
       background: var(--bg);
-      min-height: 100dvh;
+      min-height: 100svh;
     }
     body {
       margin: 0;
-      min-height: 100dvh;
+      min-height: 100svh;
       background: var(--bg);
       color: var(--text);
       font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif;
@@ -43,7 +43,7 @@
       -webkit-tap-highlight-color: transparent;
       -webkit-font-smoothing: antialiased;
     }
-    #content { padding: 0 0 calc(68px + env(safe-area-inset-bottom, 0px)); min-height: 100dvh; }
+    #content { padding: 0 0 calc(68px + env(safe-area-inset-bottom, 0px)); min-height: 100svh; }
     .tab-panel { padding: 16px; display: none; }
     .tab-panel.active { display: block; }
 
@@ -60,8 +60,8 @@
     .qpill:active { transform: scale(.95); }
 
     /* iOS grouped form card */
-    .form-card { background: var(--surface); border-radius: var(--r-lg); box-shadow: var(--sh); overflow: hidden; margin-bottom: 14px; }
-    .frow { display: flex; align-items: center; padding: 13px 16px; gap: 10px; position: relative; }
+    .form-card { background: var(--surface); border-radius: var(--r-lg); box-shadow: var(--sh); overflow: clip; margin-bottom: 14px; }
+    .frow { display: flex; align-items: center; padding: 20px 16px; gap: 10px; position: relative; }
     .frow + .frow::before { content: ''; position: absolute; top: 0; left: 16px; right: 0; height: 1px; background: var(--border); }
     .frow-lbl { font-size: 14px; font-weight: 500; white-space: nowrap; min-width: 116px; color: var(--text); display: flex; align-items: center; gap: 5px; }
     .opt-badge { font-size: 10px; font-weight: 400; color: var(--hint); background: rgba(128,128,128,.12); border-radius: 4px; padding: 1px 5px; letter-spacing: .2px; }
@@ -69,14 +69,15 @@
     .frow textarea { resize: none; line-height: 1.4; }
     .frow input::placeholder, .frow textarea::placeholder { color: var(--hint); }
     .frow input[type="date"] { text-align: right; }
-    .frow select { -webkit-appearance: none; appearance: none; cursor: pointer; }
+    .frow select { -webkit-appearance: none; appearance: none; cursor: pointer; text-align: left; text-align-last: right; }
     .frow .si { color: var(--hint); font-size: 13px; pointer-events: none; }
-    .frow.amt { padding: 15px 16px; }
-    .frow.amt input { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.5px; }
+    .frow.amt { padding: 14px 16px 18px; flex-wrap: wrap; gap: 4px; }
+    .frow.amt .frow-lbl { width: 100%; min-width: 0; font-size: 12px; font-weight: 500; color: var(--hint); }
+    .frow.amt input { width: 100%; flex: none; text-align: center; font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.5px; }
     .amt-cur { font-size: 18px; font-weight: 600; color: var(--hint); }
 
     /* Submit button */
-    .submit-btn { width: 100%; border: none; border-radius: var(--r-lg); padding: 15px; font-size: 16px; font-weight: 700; cursor: pointer; transition: all .2s var(--ease); letter-spacing: .2px; display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .submit-btn { width: 100%; border: none; border-radius: var(--r-lg); padding: 15px; font-size: 16px; font-weight: 700; cursor: pointer; transition: background .2s var(--ease), box-shadow .2s var(--ease), opacity .2s, transform .2s var(--ease); letter-spacing: .2px; display: flex; align-items: center; justify-content: center; gap: 8px; }
     .submit-btn:active:not(:disabled) { transform: scale(.97); }
     .submit-btn.out { background: var(--out); color: #fff; box-shadow: 0 4px 18px var(--out-glow); }
     .submit-btn.in  { background: var(--in);  color: #fff; box-shadow: 0 4px 18px var(--in-glow); }
@@ -620,7 +621,7 @@ const S = {
 
 function lsGet(k,d=''){return localStorage.getItem(APP_ID+':'+k)??d;}
 function lsSet(k,v){localStorage.setItem(APP_ID+':'+k,v);}
-function load(key,def){try{return JSON.parse(lsGet(key,'null'))||def;}catch{return def;}}
+function load(key,def){try{const v=JSON.parse(lsGet(key,'null'));return v!==null?v:def;}catch{return def;}}
 function save(key,val){lsSet(key,JSON.stringify(val));}
 
 async function fetchDictionary(lang) {
