@@ -61,23 +61,24 @@
 
     /* iOS grouped form card */
     .form-card { background: var(--surface); border-radius: var(--r-lg); box-shadow: var(--sh); overflow: clip; margin-bottom: 14px; }
-    .frow { display: flex; align-items: center; padding: 20px 16px; gap: 10px; position: relative; }
+    .frow { display: flex; flex-direction: column; align-items: flex-start; padding: 12px 16px; gap: 2px; position: relative; }
     .frow + .frow::before { content: ''; position: absolute; top: 0; left: 16px; right: 0; height: 1px; background: var(--border); }
-    .frow-lbl { font-size: 14px; font-weight: 500; white-space: nowrap; min-width: 116px; color: var(--text); display: flex; align-items: center; gap: 5px; }
+    .frow-lbl { font-size: 12px; font-weight: 500; color: var(--hint); display: flex; align-items: center; gap: 5px; width: 100%; }
     .opt-badge { font-size: 10px; font-weight: 400; color: var(--hint); background: rgba(128,128,128,.12); border-radius: 4px; padding: 1px 5px; letter-spacing: .2px; }
-    .frow input, .frow select, .frow textarea { flex: 1; border: none; outline: none; background: transparent; font-size: 14px; color: var(--text); text-align: right; font-family: inherit; }
-    .frow textarea { resize: none; line-height: 1.4; }
-    .frow input::placeholder, .frow textarea::placeholder { color: var(--hint); }
-    .frow input[type="date"] { text-align: right; }
-    .frow select { -webkit-appearance: none; appearance: none; cursor: pointer; text-align: left; text-align-last: right; }
-    .frow .si { color: var(--hint); font-size: 13px; pointer-events: none; }
-    .frow.amt { padding: 14px 16px 18px; flex-wrap: wrap; gap: 4px; }
-    .frow.amt .frow-lbl { width: 100%; min-width: 0; font-size: 12px; font-weight: 500; color: var(--hint); }
-    .frow.amt input { width: 100%; flex: none; text-align: center; font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.5px; }
+    .frow input, .frow select, .frow textarea { width: 100%; border: none; outline: none; background: transparent; font-size: 16px; color: var(--text); text-align: left; font-family: inherit; padding: 4px 0; -webkit-appearance: none; appearance: none; }
+    .frow textarea { resize: none; line-height: 1.4; padding-top: 6px; }
+    .frow input::placeholder, .frow textarea::placeholder { color: var(--hint); opacity: 0.5; }
+    .frow input[type="date"] { text-align: left; min-height: 24px; }
+    .frow select { cursor: pointer; padding-right: 24px; }
+    .frow .si { position: absolute; right: 16px; bottom: 15px; color: var(--hint); font-size: 14px; pointer-events: none; }
+    
+    .frow.amt { padding: 12px 16px; align-items: center; gap: 2px; }
+    .frow.amt .frow-lbl { justify-content: center; font-size: 12px; font-weight: 500; text-transform: none; letter-spacing: normal; }
+    .frow.amt input { text-align: center; font-size: 32px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -1px; padding: 0; }
     .amt-cur { font-size: 18px; font-weight: 600; color: var(--hint); }
 
     /* Submit button */
-    .submit-btn { width: 100%; border: none; border-radius: var(--r-lg); padding: 15px; font-size: 16px; font-weight: 700; cursor: pointer; transition: background .2s var(--ease), box-shadow .2s var(--ease), opacity .2s, transform .2s var(--ease); letter-spacing: .2px; display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .submit-btn { width: 100%; border: none; border-radius: var(--r-lg); padding: 16px; font-size: 17px; font-weight: 700; cursor: pointer; transition: all .2s var(--ease); letter-spacing: .2px; display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 10px; }
     .submit-btn:active:not(:disabled) { transform: scale(.97); }
     .submit-btn.out { background: var(--out); color: #fff; box-shadow: 0 4px 18px var(--out-glow); }
     .submit-btn.in  { background: var(--in);  color: #fff; box-shadow: 0 4px 18px var(--in-glow); }
@@ -323,11 +324,6 @@
         <i class="bi bi-chevron-right si"></i>
       </div>
 
-      <div class="frow amt">
-        <label class="frow-lbl" for="fAmount" data-i18n="amount">Сумма</label>
-        <input type="number" id="fAmount" placeholder="0" min="0" step="any" inputmode="decimal">
-      </div>
-
       <div class="frow" id="fAccountWrap">
         <label class="frow-lbl" for="fAccount">
           <span data-i18n="account">Счёт</span>
@@ -344,6 +340,11 @@
         </label>
         <textarea id="fNote" rows="1"
                   data-i18n-placeholder="optional" placeholder="Необязательно"></textarea>
+      </div>
+
+      <div class="frow amt">
+        <label class="frow-lbl" for="fAmount" data-i18n="amount">Сумма</label>
+        <input type="number" id="fAmount" placeholder="0" min="0" step="any" inputmode="decimal">
       </div>
 
     </div>
@@ -1301,6 +1302,20 @@ function startApp(){
   }else{document.getElementById('no-id-banner').style.display='block';}
   setType(S.expenseType);
   if(S.spreadsheetId){syncCategories('outflow');syncCategories('inflow');syncAccounts();syncSubcats();}
+
+  // Keyboard focus handling
+  const scrollIntoView = (el) => {
+    setTimeout(() => {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 300);
+  };
+  const fAmt = document.getElementById('fAmount');
+  const fNote = document.getElementById('fNote');
+  const btn = document.getElementById('submitBtn');
+  
+  [fAmt, fNote].forEach(el => {
+    el.addEventListener('focus', () => scrollIntoView(btn));
+  });
 }
 
 async function init(){
