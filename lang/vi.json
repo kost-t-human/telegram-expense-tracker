@@ -79,5 +79,13 @@
   "mon_1": "Tháng 1", "mon_2": "Tháng 2", "mon_3": "Tháng 3", "mon_4": "Tháng 4", "mon_5": "Tháng 5", "mon_6": "Tháng 6",
   "mon_7": "Tháng 7", "mon_8": "Tháng 8", "mon_9": "Tháng 9", "mon_10": "Tháng 10", "mon_11": "Tháng 11", "mon_12": "Tháng 12",
   "year_format_val": "Năm {y}",
-  "month_format_val": "{m} năm {y}"
+  "month_format_val": "{m} năm {y}",
+  "trend_view": "Xu hướng",
+  "savings_rate": "Tỷ lệ tiết kiệm",
+  "daily_avg_exp": "TB/ngày",
+  "vs_prev": "so kỳ trước",
+  "top_expense": "Khoản chi lớn nhất",
+  "of_total": "của tổng",
+  "day_short": "ng",
+  "records_count": "gd"
 }

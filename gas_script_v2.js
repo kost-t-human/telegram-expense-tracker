@@ -100,6 +100,7 @@ function doGet(e) {
       case 'addRecord':      return addRecord(ss, p);
       case 'checkDuplicate': return checkDuplicate(ss, p);
       case 'getSummary':     return getSummary(ss, p.period, p.groupBy || 'month', p.viewBy || 'category');
+      case 'getTrend':       return getTrend(ss, p.endPeriod, Number(p.count) || 6, p.groupBy || 'month');
       default:               return err('unknown action: ' + p.action);
     }
   } catch (e) {
@@ -407,14 +408,32 @@ function checkDuplicate(ss, p) {
 // Summary
 // ══════════════════════════════════════════════════════════════
 
+function prevPeriod(period, groupBy) {
+  if (groupBy === 'year') {
+    return String(Number(period) - 1);
+  }
+  const [y, m] = period.split('-').map(Number);
+  if (m === 1) return `${y - 1}-12`;
+  return `${y}-${String(m - 1).padStart(2, '0')}`;
+}
+
+function daysInPeriod(period, groupBy) {
+  if (groupBy === 'year') {
+    const y = Number(period);
+    return ((y % 4 === 0 && y % 100 !== 0) || y % 400 === 0) ? 366 : 365;
+  }
+  const [y, m] = period.split('-').map(Number);
+  return new Date(y, m, 0).getDate();
+}
+
 function getSummary(ss, period, groupBy, viewBy) {
   const sheet = ss.getSheetByName(SH_OUTFLOWS);
   if (!sheet || sheet.getLastRow() < 2)
-    return json({ status: 'ok', period, groupBy, viewBy, outflows: [], income: [] });
+    return json({ status: 'ok', period, groupBy, viewBy, outflows: [], income: [],
+                  prevOutflowTotal: 0, prevIncomeTotal: 0, daysInPeriod: daysInPeriod(period, groupBy) });
 
   const tz   = Session.getScriptTimeZone();
   const rows = sheetData(sheet, 1, HDR_OUTFLOWS.length);
-  const outMap = {}, inMap = {};
 
   const colIdxMap = {};
   RECORD_COLUMNS.forEach((key, i) => colIdxMap[key] = i);
@@ -422,6 +441,12 @@ function getSummary(ss, period, groupBy, viewBy) {
   let colIdx = colIdxMap['category'];
   if (viewBy === 'subcategory') colIdx = colIdxMap['subcategory'];
   if (viewBy === 'account')     colIdx = colIdxMap['account'];
+
+  const prev = prevPeriod(period, groupBy);
+
+  // {label: {total, count}}
+  const outMap = {}, inMap = {};
+  let prevOutTotal = 0, prevInTotal = 0;
 
   for (const row of rows) {
     const d = row[colIdxMap['date']];
@@ -432,20 +457,86 @@ function getSummary(ss, period, groupBy, viewBy) {
     else
       key = String(d).substring(0, groupBy === 'year' ? 4 : 7);
 
-    if (key !== period) continue;
-
     const amount = Number(row[colIdxMap['amount']]) || 0;
-    const val    = String(row[colIdx] || 'Other');
     const type   = String(row[colIdxMap['type']] || 'outflow');
 
-    if (type === 'inflow') inMap[val]  = (inMap[val]  || 0) + amount;
-    else                   outMap[val] = (outMap[val] || 0) + amount;
+    if (key === prev) {
+      if (type === 'inflow') prevInTotal  += amount;
+      else                   prevOutTotal += amount;
+      continue;
+    }
+
+    if (key !== period) continue;
+
+    const val = String(row[colIdx] || 'Other');
+    if (type === 'inflow') {
+      if (!inMap[val])  inMap[val]  = { total: 0, count: 0 };
+      inMap[val].total  += amount; inMap[val].count++;
+    } else {
+      if (!outMap[val]) outMap[val] = { total: 0, count: 0 };
+      outMap[val].total += amount; outMap[val].count++;
+    }
   }
 
   const sorted = obj =>
-    Object.entries(obj).map(([label, total]) => ({ label, total }))
+    Object.entries(obj)
+      .map(([label, v]) => ({ label, total: v.total, count: v.count }))
       .sort((a, b) => b.total - a.total);
 
-  return json({ status: 'ok', period, groupBy, viewBy, outflows: sorted(outMap), income: sorted(inMap) });
+  return json({
+    status: 'ok', period, groupBy, viewBy,
+    outflows: sorted(outMap),
+    income:   sorted(inMap),
+    prevOutflowTotal: prevOutTotal,
+    prevIncomeTotal:  prevInTotal,
+    daysInPeriod:     daysInPeriod(period, groupBy)
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+// Trend (last N periods)
+// ══════════════════════════════════════════════════════════════
+
+function getTrend(ss, endPeriod, count, groupBy) {
+  const sheet = ss.getSheetByName(SH_OUTFLOWS);
+  if (!sheet || sheet.getLastRow() < 2)
+    return json({ status: 'ok', trend: [] });
+
+  // Build list of periods from oldest to newest
+  const periods = [];
+  let p = endPeriod;
+  for (let i = 0; i < count; i++) {
+    periods.unshift(p);
+    p = prevPeriod(p, groupBy);
+  }
+
+  const periodSet = new Set(periods);
+  const totals = {};
+  periods.forEach(pd => { totals[pd] = { outflow: 0, income: 0 }; });
+
+  const tz   = Session.getScriptTimeZone();
+  const rows = sheetData(sheet, 1, HDR_OUTFLOWS.length);
+  const colIdxMap = {};
+  RECORD_COLUMNS.forEach((key, i) => colIdxMap[key] = i);
+
+  for (const row of rows) {
+    const d = row[colIdxMap['date']];
+    if (!d) continue;
+    let key = '';
+    if (d instanceof Date && !isNaN(d))
+      key = Utilities.formatDate(d, tz, groupBy === 'year' ? 'yyyy' : 'yyyy-MM');
+    else
+      key = String(d).substring(0, groupBy === 'year' ? 4 : 7);
+
+    if (!periodSet.has(key)) continue;
+
+    const amount = Number(row[colIdxMap['amount']]) || 0;
+    const type   = String(row[colIdxMap['type']] || 'outflow');
+    if (type === 'inflow') totals[key].income  += amount;
+    else                   totals[key].outflow += amount;
+  }
+
+  const trend = periods.map(pd => ({ period: pd, outflow: totals[pd].outflow, income: totals[pd].income }));
+  return json({ status: 'ok', trend });
 }
 

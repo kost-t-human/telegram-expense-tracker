@@ -79,5 +79,13 @@
   "mon_1": "Январь", "mon_2": "Февраль", "mon_3": "Март", "mon_4": "Апрель", "mon_5": "Май", "mon_6": "Июнь",
   "mon_7": "Июль", "mon_8": "Август", "mon_9": "Сентябрь", "mon_10": "Октябрь", "mon_11": "Ноябрь", "mon_12": "Декабрь",
   "year_format_val": "{y} год",
-  "month_format_val": "{m} {y}"
+  "month_format_val": "{m} {y}",
+  "trend_view": "Динамика",
+  "savings_rate": "Норма сбережений",
+  "daily_avg_exp": "В день",
+  "vs_prev": "к предыд.",
+  "top_expense": "Лидер расходов",
+  "of_total": "от суммы",
+  "day_short": "дн",
+  "records_count": "опер."
 }
