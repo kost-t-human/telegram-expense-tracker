@@ -385,7 +385,7 @@
 
       <div class="frow amt">
         <label class="frow-lbl" for="fAmount" data-i18n="amount">Сумма</label>
-        <input type="number" id="fAmount" placeholder="0" min="0" step="any" inputmode="decimal">
+        <input type="text" id="fAmount" placeholder="0" inputmode="decimal" autocomplete="off">
       </div>
 
     </div>
@@ -1135,7 +1135,7 @@ async function syncSubcats(){
 async function submitForm(){
   const date       =document.getElementById('fDate').value;
   const category   =document.getElementById('fCategory').value;
-  const amount     =document.getElementById('fAmount').value;
+  const amount     =document.getElementById('fAmount').value.replace(/\s/g,'').replace(',','.');
   const subcategory=document.getElementById('fSubcategory').value.trim();
   const account    =document.getElementById('fAccount').value.trim();
   const note       =document.getElementById('fNote').value.trim();
@@ -1516,9 +1516,19 @@ function startApp(){
   const fAmt = document.getElementById('fAmount');
   const fNote = document.getElementById('fNote');
   const btn = document.getElementById('submitBtn');
-  
+
   [fAmt, fNote].forEach(el => {
     el.addEventListener('focus', () => scrollIntoView(btn));
+  });
+
+  fAmt.addEventListener('input', () => {
+    const raw = fAmt.value.replace(/\s/g, '').replace(',', '.');
+    // Keep only digits and one decimal point
+    const clean = raw.replace(/[^\d.]/g, '').replace(/^(\d*\.?\d*).*$/, '$1');
+    const parts = clean.split('.');
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+    const formatted = parts.length > 1 ? parts[0] + '.' + parts[1] : parts[0];
+    if (fAmt.value !== formatted) fAmt.value = formatted;
   });
 }
 
