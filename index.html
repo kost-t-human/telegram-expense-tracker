@@ -352,7 +352,7 @@
 
       <div class="frow">
         <label class="frow-lbl" for="fCategory" data-i18n="category">Категория</label>
-        <select id="fCategory"></select>
+        <select id="fCategory" onchange="renderSubcatSelect()"></select>
         <i class="bi bi-chevron-right si"></i>
       </div>
 
@@ -516,6 +516,13 @@
 
     <div id="settings-subcats-wrap">
       <div class="sec-hdr mt-3" data-i18n="subcats_section">Подкатегории</div>
+      <div class="form-card mb-3">
+        <div class="frow">
+          <label class="frow-lbl" data-i18n="category">Категория</label>
+          <select id="sSubcatCat" onchange="S.settingsSubcatCat=this.value;renderSubcatSettingsList()"></select>
+          <i class="bi bi-chevron-right si"></i>
+        </div>
+      </div>
       <div class="new-cat-row">
         <input type="text" id="sNewSubcat" class="new-cat-input"
                data-i18n-placeholder="new_subcat_placeholder"
@@ -642,8 +649,9 @@ const S = {
   freq:     load('freq',{}),
   accounts:        load('accounts',[]),
   hiddenAccounts:  load('hiddenAccounts',[]),
-  subcats:         load('subcats',[]),
-  hiddenSubcats:   load('hiddenSubcats',[]),
+  subcats:         load('subcats',{}),
+  hiddenSubcats:   load('hiddenSubcats',{}),
+  settingsSubcatCat: '',
   useSubcats:      load('useSubcats', true),
   useAccounts:     load('useAccounts', true),
   minusSign:       load('minusSign', false),
@@ -660,6 +668,9 @@ const S = {
   if(dirty){save('catCache',S.catCache);save('hidden',S.hidden);save('freq',S.freq);}
   if(S.expenseType==='expense'){S.expenseType='outflow';lsSet('expenseType','outflow');}
   if(S.expenseType==='inflow') {S.expenseType='inflow'; lsSet('expenseType','inflow');}
+  // Migrate subcats from flat array (v1) to per-category object (v2)
+  if(Array.isArray(S.subcats)){S.subcats={};save('subcats',S.subcats);}
+  if(Array.isArray(S.hiddenSubcats)){S.hiddenSubcats={};save('hiddenSubcats',S.hiddenSubcats);}
 })();
 
 function lsGet(k,d=''){return localStorage.getItem(APP_ID+':'+k)??d;}
@@ -832,7 +843,7 @@ function showTab(tab, pushState=true){
   document.getElementById('tab-'+tab).classList.add('active');
   document.getElementById('nav-'+tab).classList.add('active');
   if(tab==='summary')renderSummary();
-  if(tab==='settings'){renderCatList();renderAccountSettingsList();renderSubcatSettingsList();}
+  if(tab==='settings'){renderCatList();renderAccountSettingsList();renderSubcatCatSelect();}
   if(pushState) history.pushState({tab}, '', '#'+tab);
   const tgBB = window.Telegram?.WebApp?.BackButton;
   if(tgBB){ tab==='main' ? tgBB.hide() : tgBB.show(); }
@@ -879,13 +890,16 @@ function renderCategorySelect(){
   const sel=document.getElementById('fCategory'), prev=sel.value, cats=activeCategories(S.expenseType);
   sel.innerHTML=cats.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
   if(cats.includes(prev))sel.value=prev;
+  renderSubcatSelect();
 }
 
 function activeAccounts(){
   return S.accounts.filter(a=>!(S.hiddenAccounts||[]).includes(a));
 }
-function activeSubcats(){
-  return S.subcats.filter(s=>!(S.hiddenSubcats||[]).includes(s));
+function activeSubcats(cat){
+  const all=S.subcats[cat]||[];
+  const hid=S.hiddenSubcats[cat]||[];
+  return all.filter(s=>!hid.includes(s));
 }
 
 function renderAccountSelect(){
@@ -894,7 +908,8 @@ function renderAccountSelect(){
   if(items.includes(prev))sel.value=prev;
 }
 function renderSubcatSelect(){
-  const sel=document.getElementById('fSubcategory'), prev=sel.value, items=activeSubcats();
+  const cat=document.getElementById('fCategory').value;
+  const sel=document.getElementById('fSubcategory'), prev=sel.value, items=cat?activeSubcats(cat):[];
   sel.innerHTML=`<option value="">${esc(t('no_subcat'))}</option>`+items.map(s=>`<option value="${esc(s)}">${esc(s)}</option>`).join('');
   if(items.includes(prev))sel.value=prev;
 }
@@ -923,10 +938,25 @@ function renderAccountSettingsList(){
     list.appendChild(row);
   });
 }
+function renderSubcatCatSelect(){
+  const sel=document.getElementById('sSubcatCat');
+  if(!sel)return;
+  const cats=activeCategories(S.settingsCatType);
+  const prev=sel.value;
+  sel.innerHTML=`<option value="">${esc(t('select_cat_for_subcats'))}</option>`+cats.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
+  if(S.settingsSubcatCat&&cats.includes(S.settingsSubcatCat))sel.value=S.settingsSubcatCat;
+  else if(cats.includes(prev))sel.value=prev;
+  S.settingsSubcatCat=sel.value;
+  renderSubcatSettingsList();
+}
 function renderSubcatSettingsList(){
-  const items=activeSubcats(), list=document.getElementById('subcatSettingsList');
+  const sel=document.getElementById('sSubcatCat');
+  const cat=sel?sel.value:'';
+  const items=cat?activeSubcats(cat):[];
+  const list=document.getElementById('subcatSettingsList');
   if(!list)return;
   list.innerHTML='';
+  if(!cat){list.innerHTML=`<div class="cat-item" style="color:var(--hint);font-size:13px;justify-content:center">${esc(t('select_cat_for_subcats'))}</div>`;return;}
   items.forEach((item,i)=>{
     const row=document.createElement('div');
     row.className='cat-item'; row.draggable=true; row.dataset.index=i;
@@ -949,16 +979,18 @@ function renderSubcatSettingsList(){
 }
 
 function reorderList(kind,fromI,toI){
-  const active=kind==='accounts'?activeAccounts():activeSubcats();
-  const moved=active.splice(fromI,1)[0];
-  active.splice(toI,0,moved);
   if(kind==='accounts'){
+    const active=activeAccounts(), moved=active.splice(fromI,1)[0];
+    active.splice(toI,0,moved);
     const hid=S.accounts.filter(a=>S.hiddenAccounts.includes(a));
     S.accounts=[...active,...hid]; save('accounts',S.accounts);
     renderAccountSettingsList(); renderAccountSelect();
   } else {
-    const hid=S.subcats.filter(s=>S.hiddenSubcats.includes(s));
-    S.subcats=[...active,...hid]; save('subcats',S.subcats);
+    const cat=document.getElementById('sSubcatCat')?.value; if(!cat)return;
+    const active=activeSubcats(cat), moved=active.splice(fromI,1)[0];
+    active.splice(toI,0,moved);
+    const hid=(S.subcats[cat]||[]).filter(s=>(S.hiddenSubcats[cat]||[]).includes(s));
+    S.subcats[cat]=[...active,...hid]; save('subcats',S.subcats);
     renderSubcatSettingsList(); renderSubcatSelect();
   }
 }
@@ -969,7 +1001,9 @@ function hideListItem(kind,name){
     save('hiddenAccounts',S.hiddenAccounts);
     renderAccountSettingsList(); renderAccountSelect();
   } else {
-    if(!S.hiddenSubcats.includes(name))S.hiddenSubcats.push(name);
+    const cat=document.getElementById('sSubcatCat')?.value; if(!cat)return;
+    if(!S.hiddenSubcats[cat])S.hiddenSubcats[cat]=[];
+    if(!S.hiddenSubcats[cat].includes(name))S.hiddenSubcats[cat].push(name);
     save('hiddenSubcats',S.hiddenSubcats);
     renderSubcatSettingsList(); renderSubcatSelect();
   }
@@ -980,7 +1014,9 @@ function restoreHiddenAccounts(){
   renderAccountSettingsList(); renderAccountSelect(); showToast(t('accounts_restored'));
 }
 function restoreHiddenSubcats(){
-  S.hiddenSubcats=[]; save('hiddenSubcats',S.hiddenSubcats);
+  const cat=document.getElementById('sSubcatCat')?.value;
+  if(cat){S.hiddenSubcats[cat]=[];}else{S.hiddenSubcats={};}
+  save('hiddenSubcats',S.hiddenSubcats);
   renderSubcatSettingsList(); renderSubcatSelect(); showToast(t('subcats_restored'));
 }
 
@@ -988,22 +1024,36 @@ async function addListItem(kind){
   const inputId=kind==='accounts'?'sNewAccount':'sNewSubcat';
   const input=document.getElementById(inputId), name=input.value.trim();
   if(!name)return;
-  const existing=kind==='accounts'?S.accounts:S.subcats;
-  const dup=existing.find(c=>c.toLowerCase()===name.toLowerCase());
-  if(dup){showToast(t('item_exists')(dup),'warning');return;}
-  input.disabled=true;
-  if(S.spreadsheetId){
-    try{
-      const res=await apiGet({action:'addListItem',spreadsheetId:S.spreadsheetId,list:kind,name});
-      if(res.status==='duplicate'){showToast(t('item_exists')(res.existing),'warning');input.disabled=false;return;}
-      if(res.status!=='ok')throw new Error(res.message);
-    }catch(e){showToast(t('error_prefix')+e.message,'error');input.disabled=false;return;}
-  }
   if(kind==='accounts'){
+    const existing=S.accounts;
+    const dup=existing.find(c=>c.toLowerCase()===name.toLowerCase());
+    if(dup){showToast(t('item_exists')(dup),'warning');return;}
+    input.disabled=true;
+    if(S.spreadsheetId){
+      try{
+        const res=await apiGet({action:'addListItem',spreadsheetId:S.spreadsheetId,list:kind,name});
+        if(res.status==='duplicate'){showToast(t('item_exists')(res.existing),'warning');input.disabled=false;return;}
+        if(res.status!=='ok')throw new Error(res.message);
+      }catch(e){showToast(t('error_prefix')+e.message,'error');input.disabled=false;return;}
+    }
     S.accounts=[...S.accounts,name]; save('accounts',S.accounts);
     renderAccountSettingsList(); renderAccountSelect(); showToast(t('account_added'));
   } else {
-    S.subcats=[...S.subcats,name]; save('subcats',S.subcats);
+    const cat=document.getElementById('sSubcatCat')?.value;
+    if(!cat){showToast(t('select_cat_for_subcats'),'warning');return;}
+    const existing=S.subcats[cat]||[];
+    const dup=existing.find(c=>c.toLowerCase()===name.toLowerCase());
+    if(dup){showToast(t('item_exists')(dup),'warning');return;}
+    input.disabled=true;
+    if(S.spreadsheetId){
+      try{
+        const res=await apiGet({action:'addListItem',spreadsheetId:S.spreadsheetId,list:'subcats',name,category:cat});
+        if(res.status==='duplicate'){showToast(t('item_exists')(res.existing),'warning');input.disabled=false;return;}
+        if(res.status!=='ok')throw new Error(res.message);
+      }catch(e){showToast(t('error_prefix')+e.message,'error');input.disabled=false;return;}
+    }
+    if(!S.subcats[cat])S.subcats[cat]=[];
+    S.subcats[cat]=[...S.subcats[cat],name]; save('subcats',S.subcats);
     renderSubcatSettingsList(); renderSubcatSelect(); showToast(t('subcat_added'));
   }
   input.value=''; input.disabled=false;
@@ -1012,27 +1062,39 @@ async function addListItem(kind){
 async function editListItem(kind,oldName){
   const newName=prompt(t('rename_prompt'),oldName)?.trim();
   if(!newName||newName===oldName)return;
-  const existing=kind==='accounts'?S.accounts:S.subcats;
-  const dup=existing.find(c=>c.toLowerCase()===newName.toLowerCase()&&c!==oldName);
-  if(dup){showToast(t('item_exists')(dup),'warning');return;}
-  if(S.spreadsheetId){
-    try{
-      const res=await apiGet({action:'renameListItem',spreadsheetId:S.spreadsheetId,list:kind,oldName,newName});
-      if(res.status==='duplicate'){showToast(t('item_exists')(res.existing),'warning');return;}
-      if(res.status!=='ok')throw new Error(res.message);
-    }catch(e){showToast(t('error_prefix')+e.message,'error');return;}
-  }
   if(kind==='accounts'){
+    const existing=S.accounts;
+    const dup=existing.find(c=>c.toLowerCase()===newName.toLowerCase()&&c!==oldName);
+    if(dup){showToast(t('item_exists')(dup),'warning');return;}
+    if(S.spreadsheetId){
+      try{
+        const res=await apiGet({action:'renameListItem',spreadsheetId:S.spreadsheetId,list:kind,oldName,newName});
+        if(res.status==='duplicate'){showToast(t('item_exists')(res.existing),'warning');return;}
+        if(res.status!=='ok')throw new Error(res.message);
+      }catch(e){showToast(t('error_prefix')+e.message,'error');return;}
+    }
     const idx=S.accounts.indexOf(oldName);
     if(idx!==-1){S.accounts[idx]=newName;save('accounts',S.accounts);}
     const hidIdx=S.hiddenAccounts.indexOf(oldName);
     if(hidIdx!==-1){S.hiddenAccounts[hidIdx]=newName;save('hiddenAccounts',S.hiddenAccounts);}
     renderAccountSettingsList(); renderAccountSelect();
   } else {
-    const idx=S.subcats.indexOf(oldName);
-    if(idx!==-1){S.subcats[idx]=newName;save('subcats',S.subcats);}
-    const hidIdx=S.hiddenSubcats.indexOf(oldName);
-    if(hidIdx!==-1){S.hiddenSubcats[hidIdx]=newName;save('hiddenSubcats',S.hiddenSubcats);}
+    const cat=document.getElementById('sSubcatCat')?.value; if(!cat)return;
+    const existing=S.subcats[cat]||[];
+    const dup=existing.find(c=>c.toLowerCase()===newName.toLowerCase()&&c!==oldName);
+    if(dup){showToast(t('item_exists')(dup),'warning');return;}
+    if(S.spreadsheetId){
+      try{
+        const res=await apiGet({action:'renameListItem',spreadsheetId:S.spreadsheetId,list:'subcats',oldName,newName,category:cat});
+        if(res.status==='duplicate'){showToast(t('item_exists')(res.existing),'warning');return;}
+        if(res.status!=='ok')throw new Error(res.message);
+      }catch(e){showToast(t('error_prefix')+e.message,'error');return;}
+    }
+    const idx=existing.indexOf(oldName);
+    if(idx!==-1){S.subcats[cat][idx]=newName;save('subcats',S.subcats);}
+    const hid=S.hiddenSubcats[cat]||[];
+    const hidIdx=hid.indexOf(oldName);
+    if(hidIdx!==-1){S.hiddenSubcats[cat][hidIdx]=newName;save('hiddenSubcats',S.hiddenSubcats);}
     renderSubcatSettingsList(); renderSubcatSelect();
   }
 }
@@ -1053,9 +1115,18 @@ async function syncSubcats(){
   try{
     const res=await apiGet({action:'getSubcats',spreadsheetId:S.spreadsheetId});
     if(res.status!=='ok')return;
-    const sheet=res.values, hidden=S.hiddenSubcats||[], current=S.subcats;
-    S.subcats=[...current.filter(v=>sheet.some(s=>s.toLowerCase()===v.toLowerCase())),...sheet.filter(s=>!current.some(c=>c.toLowerCase()===s.toLowerCase())&&!hidden.some(h=>h.toLowerCase()===s.toLowerCase()))];
-    save('subcats',S.subcats);
+    const server=res.subcats||{};
+    const merged={};
+    const allCats=new Set([...Object.keys(S.subcats),...Object.keys(server)]);
+    for(const cat of allCats){
+      const local=S.subcats[cat]||[], hidden=S.hiddenSubcats[cat]||[], srv=server[cat]||[];
+      const m=[
+        ...local.filter(v=>srv.some(s=>s.toLowerCase()===v.toLowerCase())),
+        ...srv.filter(s=>!local.some(c=>c.toLowerCase()===s.toLowerCase())&&!hidden.some(h=>h.toLowerCase()===s.toLowerCase()))
+      ];
+      if(m.length)merged[cat]=m;
+    }
+    S.subcats=merged; save('subcats',S.subcats);
     renderSubcatSelect(); renderSubcatSettingsList();
   }catch{}
 }
@@ -1317,7 +1388,7 @@ function saveSheetId(){
   document.getElementById('no-id-banner').style.display='none';
   S.catCache={}; save('catCache',{});
   S.accounts=[]; save('accounts',[]); S.hiddenAccounts=[]; save('hiddenAccounts',[]);
-  S.subcats=[];  save('subcats',[]); S.hiddenSubcats=[];  save('hiddenSubcats',[]);
+  S.subcats={};  save('subcats',{}); S.hiddenSubcats={};  save('hiddenSubcats',{});
   Promise.all([syncCategories('outflow'),syncCategories('inflow'),syncAccounts(),syncSubcats()])
     .then(()=>{showToast(t('table_connected'));renderCatList();})
     .catch(()=>showToast(t('sync_error'),'error'));
@@ -1331,9 +1402,11 @@ function saveUserName(){
 
 function setSettingsCatType(type){
   S.settingsCatType=type;
+  S.settingsSubcatCat='';
   document.getElementById('sCatOut').className='cat-seg-btn'+(type==='outflow'?' active-out':'');
   document.getElementById('sCatIn').className ='cat-seg-btn'+(type==='inflow'?' active-in':'');
   renderCatList();
+  renderSubcatCatSelect();
 }
 
 function renderCatList(){

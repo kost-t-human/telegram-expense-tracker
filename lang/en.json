@@ -57,6 +57,7 @@
   "new_subcat_placeholder": "New subcategory…",
   "account_added": "Account added",
   "subcat_added": "Subcategory added",
+  "select_cat_for_subcats": "Select a category",
   "accounts_restored": "Hidden accounts restored",
   "subcats_restored": "Hidden subcategories restored",
   "no_account": "— none —",

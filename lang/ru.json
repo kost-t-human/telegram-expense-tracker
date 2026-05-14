@@ -57,6 +57,7 @@
   "new_subcat_placeholder": "Новая подкатегория…",
   "account_added": "Счёт добавлен",
   "subcat_added": "Подкатегория добавлена",
+  "select_cat_for_subcats": "Выберите категорию",
   "accounts_restored": "Скрытые счета восстановлены",
   "subcats_restored": "Скрытые подкатегории восстановлены",
   "no_account": "— не выбрано —",

@@ -14,7 +14,7 @@
     "Records"        — outflow/inflow records
     "Categories"     — category list (outflow + inflow, never deleted)
     "Accounts"       — account list (auto-populated from records)
-    "Subcategories"  — subcategory list (auto-populated from records)
+    "Subcategories"  — subcategory list per category (Name, Category, Order)
     "Users"          — Telegram user registry
 
   Type values: "outflow" | "inflow"
@@ -62,7 +62,7 @@ const SH_USERS      = 'Users';
 const HDR_OUTFLOWS   = RECORD_COLUMNS.map(key => COLUMN_DISPLAY_NAMES[key] || key);
 const HDR_CATEGORIES = ['Name','Type','Order'];
 const HDR_ACCOUNTS   = ['Name','Order'];
-const HDR_SUBCATS    = ['Name','Order'];
+const HDR_SUBCATS    = ['Name','Category','Order'];
 const HDR_USERS      = ['Name','First name','Last name','Username','Date added'];
 
 // Helper to get column index by field key (0-based)
@@ -94,7 +94,7 @@ function doGet(e) {
       case 'addCategory':    return addCategory(ss, p);
       case 'renameCategory': return renameCategory(ss, p);
       case 'getAccounts':    return getListSheet(ss, SH_ACCOUNTS, HDR_ACCOUNTS);
-      case 'getSubcats':     return getListSheet(ss, SH_SUBCATS,  HDR_SUBCATS);
+      case 'getSubcats':     return getSubcats(ss);
       case 'addListItem':    return addListItemAction(ss, p);
       case 'renameListItem': return renameListItemAction(ss, p);
       case 'addRecord':      return addRecord(ss, p);
@@ -238,19 +238,64 @@ function getListSheet(ss, sheetName, headers) {
   return json({ status: 'ok', values });
 }
 
+// Migrate old Subcategories sheet (Name, Order) → new (Name, Category, Order)
+function migrateSubcatsSheet(ss) {
+  const sheet = ss.getSheetByName(SH_SUBCATS);
+  if (!sheet || sheet.getLastRow() === 0) return;
+  const hdr = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  // Already migrated if 3+ columns
+  if (hdr.length >= 3) return;
+  // Insert Category column at position 2
+  sheet.insertColumnAfter(1);
+  sheet.getRange(1, 2).setValue('Category');
+}
+
+function getSubcats(ss) {
+  migrateSubcatsSheet(ss);
+  const sheet = getOrCreateSheet(ss, SH_SUBCATS, HDR_SUBCATS);
+  const rows  = sheetData(sheet, 1, 3);
+  const result = {};
+  rows
+    .filter(r => r[0])
+    .sort((a, b) => (Number(a[2]) || 0) - (Number(b[2]) || 0))
+    .forEach(r => {
+      const name = String(r[0]).trim();
+      const cat  = String(r[1]).trim();
+      if (!cat) return;
+      if (!result[cat]) result[cat] = [];
+      result[cat].push(name);
+    });
+  return json({ status: 'ok', subcats: result });
+}
+
 function addListItemAction(ss, p) {
   const name = String(p.name || '').trim();
   const list = String(p.list || '');
   if (!name) return err('name required');
-  const sheetName = list === 'accounts' ? SH_ACCOUNTS : SH_SUBCATS;
-  const headers   = list === 'accounts' ? HDR_ACCOUNTS : HDR_SUBCATS;
-  const sheet = getOrCreateSheet(ss, sheetName, headers);
-  const rows  = sheetData(sheet, 1, 1);
-  const dup   = rows.find(r => String(r[0]).trim().toLowerCase() === name.toLowerCase());
-  if (dup) return json({ status: 'duplicate', existing: String(dup[0]).trim() });
-  const orders  = sheetData(sheet, 1, 2).map(r => Number(r[1]) || 0);
-  const nextOrder = orders.length ? Math.max(...orders) + 1 : 1;
-  sheet.appendRow([name, nextOrder]);
+
+  if (list === 'accounts') {
+    const sheet = getOrCreateSheet(ss, SH_ACCOUNTS, HDR_ACCOUNTS);
+    const rows  = sheetData(sheet, 1, 1);
+    const dup   = rows.find(r => String(r[0]).trim().toLowerCase() === name.toLowerCase());
+    if (dup) return json({ status: 'duplicate', existing: String(dup[0]).trim() });
+    const orders  = sheetData(sheet, 1, 2).map(r => Number(r[1]) || 0);
+    const nextOrder = orders.length ? Math.max(...orders) + 1 : 1;
+    sheet.appendRow([name, nextOrder]);
+  } else {
+    migrateSubcatsSheet(ss);
+    const category = String(p.category || '').trim();
+    if (!category) return err('category required for subcats');
+    const sheet = getOrCreateSheet(ss, SH_SUBCATS, HDR_SUBCATS);
+    const rows  = sheetData(sheet, 1, 2);
+    const dup   = rows.find(r =>
+      String(r[0]).trim().toLowerCase() === name.toLowerCase() &&
+      String(r[1]).trim() === category
+    );
+    if (dup) return json({ status: 'duplicate', existing: String(dup[0]).trim() });
+    const orders  = sheetData(sheet, 1, 3).map(r => Number(r[2]) || 0);
+    const nextOrder = orders.length ? Math.max(...orders) + 1 : 1;
+    sheet.appendRow([name, category, nextOrder]);
+  }
   return json({ status: 'ok', name });
 }
 
@@ -259,30 +304,64 @@ function renameListItemAction(ss, p) {
   const newName = String(p.newName || '').trim();
   const list    = String(p.list || '');
   if (!oldName || !newName) return err('oldName and newName required');
-  const sheetName = list === 'accounts' ? SH_ACCOUNTS : SH_SUBCATS;
-  const sheet = ss.getSheetByName(sheetName);
-  if (!sheet) return err('Sheet not found');
-  const rows = sheetData(sheet, 1, 1);
-  const dup  = rows.find(r => String(r[0]).trim().toLowerCase() === newName.toLowerCase() && String(r[0]).trim() !== oldName);
-  if (dup) return json({ status: 'duplicate', existing: String(dup[0]).trim() });
-  for (let i = 0; i < rows.length; i++) {
-    if (String(rows[i][0]).trim() === oldName) {
-      sheet.getRange(i + 2, 1).setValue(newName);
-      return json({ status: 'ok', newName });
+
+  if (list === 'accounts') {
+    const sheet = ss.getSheetByName(SH_ACCOUNTS);
+    if (!sheet) return err('Sheet not found');
+    const rows = sheetData(sheet, 1, 1);
+    const dup  = rows.find(r => String(r[0]).trim().toLowerCase() === newName.toLowerCase() && String(r[0]).trim() !== oldName);
+    if (dup) return json({ status: 'duplicate', existing: String(dup[0]).trim() });
+    for (let i = 0; i < rows.length; i++) {
+      if (String(rows[i][0]).trim() === oldName) {
+        sheet.getRange(i + 2, 1).setValue(newName);
+        return json({ status: 'ok', newName });
+      }
     }
+    return err('Item not found');
+  } else {
+    migrateSubcatsSheet(ss);
+    const category = String(p.category || '').trim();
+    const sheet = ss.getSheetByName(SH_SUBCATS);
+    if (!sheet) return err('Sheet not found');
+    const rows = sheetData(sheet, 1, 2);
+    const dup  = rows.find(r =>
+      String(r[0]).trim().toLowerCase() === newName.toLowerCase() &&
+      String(r[1]).trim() === category &&
+      String(r[0]).trim() !== oldName
+    );
+    if (dup) return json({ status: 'duplicate', existing: String(dup[0]).trim() });
+    for (let i = 0; i < rows.length; i++) {
+      if (String(rows[i][0]).trim() === oldName && String(rows[i][1]).trim() === category) {
+        sheet.getRange(i + 2, 1).setValue(newName);
+        return json({ status: 'ok', newName });
+      }
+    }
+    return err('Item not found');
   }
-  return err('Item not found');
 }
 
-function upsertListItem(ss, sheetName, headers, name) {
+function upsertListItem(ss, sheetName, headers, name, category) {
   if (!name) return;
   const sheet = getOrCreateSheet(ss, sheetName, headers);
-  const rows  = sheetData(sheet, 1, 1);
-  const exists = rows.some(r => String(r[0]).trim().toLowerCase() === name.toLowerCase());
-  if (exists) return;
-  const orders = sheetData(sheet, 1, 2).map(r => Number(r[1]) || 0);
-  const nextOrder = orders.length ? Math.max(...orders) + 1 : 1;
-  sheet.appendRow([name, nextOrder]);
+  if (sheetName === SH_SUBCATS) {
+    const cat  = String(category || '').trim();
+    const rows = sheetData(sheet, 1, 2);
+    const exists = rows.some(r =>
+      String(r[0]).trim().toLowerCase() === name.toLowerCase() &&
+      String(r[1]).trim() === cat
+    );
+    if (exists) return;
+    const orders = sheetData(sheet, 1, 3).map(r => Number(r[2]) || 0);
+    const nextOrder = orders.length ? Math.max(...orders) + 1 : 1;
+    sheet.appendRow([name, cat, nextOrder]);
+  } else {
+    const rows  = sheetData(sheet, 1, 1);
+    const exists = rows.some(r => String(r[0]).trim().toLowerCase() === name.toLowerCase());
+    if (exists) return;
+    const orders = sheetData(sheet, 1, 2).map(r => Number(r[1]) || 0);
+    const nextOrder = orders.length ? Math.max(...orders) + 1 : 1;
+    sheet.appendRow([name, nextOrder]);
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -332,8 +411,9 @@ function addRecord(ss, p) {
 
   const userName = upsertUser(ss, firstName, lastName, username, p.userName);
 
+  const category = String(p.category || '').trim();
   if (account)     upsertListItem(ss, SH_ACCOUNTS, HDR_ACCOUNTS, account);
-  if (subcategory) upsertListItem(ss, SH_SUBCATS,  HDR_SUBCATS,  subcategory);
+  if (subcategory) { migrateSubcatsSheet(ss); upsertListItem(ss, SH_SUBCATS, HDR_SUBCATS, subcategory, category); }
 
   let purchaseDate = '';
   if (p.date) {
