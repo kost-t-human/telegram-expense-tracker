@@ -78,12 +78,12 @@
     .amt-cur { font-size: 18px; font-weight: 600; color: var(--hint); }
 
     /* Submit button */
-    .submit-btn { width: 100%; border: none; border-radius: var(--r-lg); padding: 16px; font-size: 17px; font-weight: 700; cursor: pointer; transition: all .2s var(--ease); letter-spacing: .2px; display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 10px; }
+    .submit-btn { width: 100%; border: none; border-radius: var(--r-lg); padding: 16px; font-size: 17px; font-weight: 700; cursor: pointer; transition: background .2s var(--ease), box-shadow .2s var(--ease), opacity .2s var(--ease), color .2s var(--ease); letter-spacing: .2px; display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 10px; }
     .submit-btn:active:not(:disabled) { transform: scale(.97); }
     .submit-btn.out { background: var(--out); color: #fff; box-shadow: 0 4px 18px var(--out-glow); }
     .submit-btn.in  { background: var(--in);  color: #fff; box-shadow: 0 4px 18px var(--in-glow); }
     .submit-btn:disabled { opacity: .72; cursor: not-allowed; transform: none; }
-    .submit-btn .btn-spinner { width: 18px; height: 18px; border: 2.5px solid rgba(255,255,255,.4); border-top-color: #fff; border-radius: 50%; animation: btn-spin .65s linear infinite; flex-shrink: 0; display: none; }
+    .submit-btn .btn-spinner { width: 18px; height: 18px; border: 2.5px solid rgba(255,255,255,.4); border-top-color: #fff; border-radius: 50%; animation: btn-spin .65s linear infinite; flex-shrink: 0; display: none; will-change: transform; }
     .submit-btn.loading .btn-spinner { display: block; }
     .submit-btn.loading .btn-label { opacity: .85; }
     @keyframes btn-spin { to { transform: rotate(360deg); } }
