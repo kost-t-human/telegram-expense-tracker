@@ -865,7 +865,9 @@ async function syncCategories(type){
     const res=await apiGet({action:'getCategories',spreadsheetId:S.spreadsheetId,type});
     if(res.status!=='ok')return;
     const sheet=res.categories, hidden=S.hidden[type]||[], current=S.catCache[type]||[];
-    S.catCache[type]=[...current.filter(c=>sheet.includes(c)),...sheet.filter(c=>!current.includes(c)&&!hidden.includes(c))];
+    const newCache=[...current.filter(c=>sheet.includes(c)),...sheet.filter(c=>!current.includes(c)&&!hidden.includes(c))];
+    if(JSON.stringify(newCache)===JSON.stringify(S.catCache[type]))return;
+    S.catCache[type]=newCache;
     save('catCache',S.catCache);
     renderQuickCats(); renderCategorySelect();
   }catch{}
@@ -873,6 +875,8 @@ async function syncCategories(type){
 
 function renderQuickCats(){
   const top=topFreqCats(S.expenseType), wrap=document.getElementById('quickCats');
+  const existing=[...wrap.querySelectorAll('.qpill')].map(b=>b.textContent);
+  if(JSON.stringify(top)===JSON.stringify(existing))return;
   wrap.innerHTML='';
   if(!top.length){wrap.style.display='none';return;}
   wrap.style.display='flex';
@@ -1105,7 +1109,9 @@ async function syncAccounts(){
     const res=await apiGet({action:'getAccounts',spreadsheetId:S.spreadsheetId});
     if(res.status!=='ok')return;
     const sheet=res.values, hidden=S.hiddenAccounts||[], current=S.accounts;
-    S.accounts=[...current.filter(v=>sheet.some(s=>s.toLowerCase()===v.toLowerCase())),...sheet.filter(s=>!current.some(c=>c.toLowerCase()===s.toLowerCase())&&!hidden.some(h=>h.toLowerCase()===s.toLowerCase()))];
+    const newAccounts=[...current.filter(v=>sheet.some(s=>s.toLowerCase()===v.toLowerCase())),...sheet.filter(s=>!current.some(c=>c.toLowerCase()===s.toLowerCase())&&!hidden.some(h=>h.toLowerCase()===s.toLowerCase()))];
+    if(JSON.stringify(newAccounts)===JSON.stringify(S.accounts))return;
+    S.accounts=newAccounts;
     save('accounts',S.accounts);
     renderAccountSelect(); renderAccountSettingsList();
   }catch{}
@@ -1127,6 +1133,7 @@ async function syncSubcats(){
       ];
       if(m.length)merged[cat]=m;
     }
+    if(JSON.stringify(merged)===JSON.stringify(S.subcats))return;
     S.subcats=merged; save('subcats',S.subcats);
     renderSubcatSelect(); renderSubcatSettingsList();
   }catch{}
