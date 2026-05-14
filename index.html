@@ -1115,7 +1115,8 @@ async function syncSubcats(){
   try{
     const res=await apiGet({action:'getSubcats',spreadsheetId:S.spreadsheetId});
     if(res.status!=='ok')return;
-    const server=res.subcats||{};
+    if(!res.subcats)return; // old GAS format — skip, don't wipe local data
+    const server=res.subcats;
     const merged={};
     const allCats=new Set([...Object.keys(S.subcats),...Object.keys(server)]);
     for(const cat of allCats){
