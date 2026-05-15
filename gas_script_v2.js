@@ -192,7 +192,7 @@ function getCategories(ss, type) {
 
   const rows = sheetData(sheet, 1, 3);
   const cats = rows
-    .filter(r => r[0] && String(r[1]) === type)
+    .filter(r => r[0] && String(r[1]).toLowerCase() === type.toLowerCase())
     .sort((a, b) => (Number(a[2]) || 0) - (Number(b[2]) || 0))
     .map(r => String(r[0]).trim());
 
@@ -207,10 +207,10 @@ function addCategory(ss, p) {
   const sheet = getOrCreateSheet(ss, SH_CATEGORIES, HDR_CATEGORIES);
   const rows  = sheetData(sheet, 1, 2);
 
-  const dup = rows.find(r => String(r[1]) === type && String(r[0]).trim().toLowerCase() === name.toLowerCase());
+  const dup = rows.find(r => String(r[1]).toLowerCase() === type.toLowerCase() && String(r[0]).trim().toLowerCase() === name.toLowerCase());
   if (dup) return json({ status: 'duplicate', existing: String(dup[0]).trim() });
 
-  const orders = sheetData(sheet, 1, 3).filter(r => String(r[1]) === type).map(r => Number(r[2]) || 0);
+  const orders = sheetData(sheet, 1, 3).filter(r => String(r[1]).toLowerCase() === type.toLowerCase()).map(r => Number(r[2]) || 0);
   const nextOrder = orders.length ? Math.max(...orders) + 1 : 1;
 
   sheet.appendRow([name, type, nextOrder]);
@@ -228,14 +228,14 @@ function renameCategory(ss, p) {
 
   const rows = sheetData(sheet, 1, 2);
   const dup = rows.find(r =>
-    String(r[1]) === type &&
+    String(r[1]).toLowerCase() === type.toLowerCase() &&
     String(r[0]).trim().toLowerCase() === newName.toLowerCase() &&
     String(r[0]).trim() !== oldName
   );
   if (dup) return json({ status: 'duplicate', existing: String(dup[0]).trim() });
 
   for (let i = 0; i < rows.length; i++) {
-    if (String(rows[i][1]) === type && String(rows[i][0]).trim() === oldName) {
+    if (String(rows[i][1]).toLowerCase() === type.toLowerCase() && String(rows[i][0]).trim() === oldName) {
       sheet.getRange(i + 2, 1).setValue(newName);
       return json({ status: 'ok', newName });
     }
@@ -427,7 +427,8 @@ function addRecord(ss, p) {
   const firstName   = String(p.firstName    || '');
   const lastName    = String(p.lastName     || '');
   const username    = String(p.username     || '');
-  const type        = String(p.type         || 'outflow');
+  const typeRaw     = String(p.type         || 'outflow').toLowerCase();
+  const type        = typeRaw.charAt(0).toUpperCase() + typeRaw.slice(1); // "Outflow" / "Inflow"
   const subcategory = String(p.subcategory  || '').trim();
   const account     = String(p.account      || '').trim();
   const txnType  = String(p.txnType        || '').trim();
@@ -473,16 +474,14 @@ function addRecord(ss, p) {
 
   sheet.appendRow(rowData);
 
-  // Copy data validation rules from the row above (if it exists and has any)
+  // Copy formatting + data validation from the row above (if it exists)
   const newRow = sheet.getLastRow();
   if (newRow > 2) {
     const numCols = RECORD_COLUMNS.length;
     const srcRange = sheet.getRange(newRow - 1, 1, 1, numCols);
-    const rules = srcRange.getDataValidations()[0];
-    if (rules.some(r => r !== null)) {
-      sheet.getRange(newRow, 1, 1, numCols)
-        .setDataValidations([rules]);
-    }
+    const dstRange = sheet.getRange(newRow, 1, 1, numCols);
+    srcRange.copyTo(dstRange, SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false);
+    srcRange.copyTo(dstRange, SpreadsheetApp.CopyPasteType.PASTE_DATA_VALIDATION, false);
   }
 
   return json({ status: 'ok' });
@@ -500,20 +499,21 @@ function checkDuplicate(ss, p) {
   const account     = String(p.account     || '').trim().toLowerCase();
   const txnType  = String(p.txnType       || '').trim().toLowerCase();
   const userName    = String(p.userName     || '');
-  const type        = String(p.type        || 'outflow');
+  const type        = String(p.type        || 'outflow').toLowerCase();
   const tz          = Session.getScriptTimeZone();
 
-  const rows = sheetData(sheet, 1, HDR_OUTFLOWS.length);
+  const lastRow = sheet.getLastRow();
+  const numCols = HDR_OUTFLOWS.length;
+  const startRow = Math.max(2, lastRow - 9); // last 10 data rows
+  const rows = sheet.getRange(startRow, 1, lastRow - startRow + 1, numCols).getValues();
   let count = 0;
 
   const colIdxMap = {};
   RECORD_COLUMNS.forEach((key, i) => colIdxMap[key] = i);
 
   for (const row of rows) {
-    const d = row[colIdxMap['date']];
-    let dateStr = '';
-    if (d instanceof Date && !isNaN(d)) dateStr = Utilities.formatDate(d, tz, 'yyyy-MM-dd');
-    else dateStr = String(d).substring(0, 10);
+    const d = getRowDate(row, colIdxMap);
+    const dateStr = d ? Utilities.formatDate(d, tz, 'yyyy-MM-dd') : '';
 
     if (
       dateStr === today &&
@@ -523,12 +523,35 @@ function checkDuplicate(ss, p) {
       String(row[colIdxMap['description']] || '').trim().toLowerCase() === note &&
       String(row[colIdxMap['account']] || '').trim().toLowerCase() === account &&
       (colIdxMap['txnType'] === undefined || String(row[colIdxMap['txnType']] || '').trim().toLowerCase() === txnType) &&
-      String(row[colIdxMap['type']] || 'outflow') === type &&
+      String(row[colIdxMap['type']] || 'outflow').toLowerCase() === type &&
       (!userName || String(row[colIdxMap['name']]) === userName)
     ) count++;
   }
 
   return json({ status: 'ok', duplicate: count > 0, count });
+}
+
+// ══════════════════════════════════════════════════════════════
+// Date resolution: timestamp → date → month
+// ══════════════════════════════════════════════════════════════
+
+// Returns the best available Date for a row, trying columns in priority order.
+// month column format: "05 May" (no year) — current year assumed as last resort.
+function getRowDate(row, colIdxMap) {
+  for (const key of ['timestamp', 'date']) {
+    if (colIdxMap[key] === undefined) continue;
+    const v = row[colIdxMap[key]];
+    if (v instanceof Date && !isNaN(v)) return v;
+    if (v) {
+      const d = new Date(v);
+      if (!isNaN(d)) return d;
+    }
+  }
+  if (colIdxMap['month'] !== undefined) {
+    const m = parseInt(String(row[colIdxMap['month']] || ''), 10);
+    if (m >= 1 && m <= 12) return new Date(new Date().getFullYear(), m - 1, 1);
+  }
+  return null;
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -576,16 +599,12 @@ function getSummary(ss, period, groupBy, viewBy) {
   let prevOutTotal = 0, prevInTotal = 0;
 
   for (const row of rows) {
-    const d = row[colIdxMap['date']];
+    const d = getRowDate(row, colIdxMap);
     if (!d) continue;
-    let key = '';
-    if (d instanceof Date && !isNaN(d))
-      key = Utilities.formatDate(d, tz, groupBy === 'year' ? 'yyyy' : 'yyyy-MM');
-    else
-      key = String(d).substring(0, groupBy === 'year' ? 4 : 7);
+    const key = Utilities.formatDate(d, tz, groupBy === 'year' ? 'yyyy' : 'yyyy-MM');
 
     const amount = Number(row[colIdxMap['amount']]) || 0;
-    const type   = String(row[colIdxMap['type']] || 'outflow');
+    const type   = String(row[colIdxMap['type']] || 'outflow').toLowerCase();
 
     if (key === prev) {
       if (type === 'inflow') prevInTotal  += amount;
@@ -647,18 +666,14 @@ function getTrend(ss, endPeriod, count, groupBy) {
   RECORD_COLUMNS.forEach((key, i) => colIdxMap[key] = i);
 
   for (const row of rows) {
-    const d = row[colIdxMap['date']];
+    const d = getRowDate(row, colIdxMap);
     if (!d) continue;
-    let key = '';
-    if (d instanceof Date && !isNaN(d))
-      key = Utilities.formatDate(d, tz, groupBy === 'year' ? 'yyyy' : 'yyyy-MM');
-    else
-      key = String(d).substring(0, groupBy === 'year' ? 4 : 7);
+    const key = Utilities.formatDate(d, tz, groupBy === 'year' ? 'yyyy' : 'yyyy-MM');
 
     if (!periodSet.has(key)) continue;
 
     const amount = Number(row[colIdxMap['amount']]) || 0;
-    const type   = String(row[colIdxMap['type']] || 'outflow');
+    const type   = String(row[colIdxMap['type']] || 'outflow').toLowerCase();
     if (type === 'inflow') totals[key].income  += amount;
     else                   totals[key].outflow += amount;
   }
