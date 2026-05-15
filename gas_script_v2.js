@@ -47,6 +47,16 @@ const RECORD_COLUMNS = [
   'name',        // User name (from settings or TG)
   'type'         // "outflow" or "inflow"
 ];
+// ── Sheet names ────────────────────────────────────────────────
+const SH_OUTFLOWS   = 'Records';
+const SH_CATEGORIES = 'Categories';
+const SH_ACCOUNTS   = 'Accounts';
+const SH_TXNTYPES   = 'Transaction Types';
+const SH_SUBCATS    = 'Subcategories';
+const SH_USERS      = 'Users';
+
+
+
 
 // Display names for the headers (you can rename these if you like)
 const COLUMN_DISPLAY_NAMES = {
@@ -63,13 +73,7 @@ const COLUMN_DISPLAY_NAMES = {
   'type':        'Type'
 };
 
-// ── Sheet names ────────────────────────────────────────────────
-const SH_OUTFLOWS   = 'Records';
-const SH_CATEGORIES = 'Categories';
-const SH_ACCOUNTS   = 'Accounts';
-const SH_TXNTYPES   = 'Transaction Types';
-const SH_SUBCATS    = 'Subcategories';
-const SH_USERS      = 'Users';
+
 
 // ── Derived headers ─────────────────────────────────────────────
 const HDR_OUTFLOWS   = RECORD_COLUMNS.map(key => COLUMN_DISPLAY_NAMES[key] || key);
@@ -159,7 +163,7 @@ function getOrCreateSheet(ss, name, headers) {
       const dateIdx = getColIdx('date');
       if (dateIdx !== -1) {
         const colLetter = String.fromCharCode(65 + dateIdx); // A, B, C...
-        sheet.getRange(`${colLetter}2:${colLetter}`).setNumberFormat('yyyy-mm-dd');
+        sheet.getRange(`${colLetter}2:${colLetter}`).setNumberFormat('dd MMM');
       }
     }
   }
@@ -435,13 +439,15 @@ function addRecord(ss, p) {
   if (txnType)       upsertListItem(ss, SH_TXNTYPES,   HDR_TXNTYPES,   txnType);
   if (subcategory) { migrateSubcatsSheet(ss); upsertListItem(ss, SH_SUBCATS, HDR_SUBCATS, subcategory, category); }
 
+  const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
   let purchaseDate = '';
   let purchaseMonth = '';
   if (p.date) {
     const [y, m, d] = String(p.date).split('-').map(Number);
     if (y && m && d) {
       purchaseDate  = new Date(y, m - 1, d);
-      purchaseMonth = m;
+      purchaseMonth = String(m).padStart(2, '0') + ' ' + MONTH_NAMES[m - 1];
     }
   }
 
@@ -466,6 +472,19 @@ function addRecord(ss, p) {
   });
 
   sheet.appendRow(rowData);
+
+  // Copy data validation rules from the row above (if it exists and has any)
+  const newRow = sheet.getLastRow();
+  if (newRow > 2) {
+    const numCols = RECORD_COLUMNS.length;
+    const srcRange = sheet.getRange(newRow - 1, 1, 1, numCols);
+    const rules = srcRange.getDataValidations()[0];
+    if (rules.some(r => r !== null)) {
+      sheet.getRange(newRow, 1, 1, numCols)
+        .setDataValidations([rules]);
+    }
+  }
+
   return json({ status: 'ok' });
 }
 
