@@ -1310,7 +1310,7 @@ async function submitForm(){
         btn.disabled=true;btn.classList.add('loading');
       }
     }
-    await doSave(date,category,subcategory,amount,account,txnType,note);
+    // Optimistic UI: confirm immediately, save in background
     if(!S.freq[S.expenseType])S.freq[S.expenseType]={};
     S.freq[S.expenseType][category]=(S.freq[S.expenseType][category]||0)+1;
     save('freq',S.freq);
@@ -1321,8 +1321,10 @@ async function submitForm(){
     document.getElementById('fNote').value='';
     renderQuickCats();
     showToast(S.expenseType==='outflow'?t('expense_saved'):t('inflow_saved'));
-  }catch(e){showToast(t('error_prefix')+e.message,'error');}
-  finally{btn.disabled=false;btn.classList.remove('loading');}
+    btn.disabled=false;btn.classList.remove('loading');
+    doSave(date,category,subcategory,amount,account,txnType,note)
+      .catch(e=>showToast(t('error_prefix')+e.message,'error'));
+  }catch(e){showToast(t('error_prefix')+e.message,'error');btn.disabled=false;btn.classList.remove('loading');}
 }
 
 function confirmDuplicate(){
