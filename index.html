@@ -295,6 +295,17 @@
       </label>
     </div>
 
+    <div class="feat-row">
+      <div class="feat-info">
+        <div class="feat-name" data-i18n="txntypes_section">Группы</div>
+        <div class="feat-desc" data-i18n="txntypes_desc">Группировка записей (Revenue / Expense и т.д.)</div>
+      </div>
+      <label class="tg-switch">
+        <input type="checkbox" id="iUseTxnTypes">
+        <span class="tg-slider"></span>
+      </label>
+    </div>
+
     <div class="feat-row mb-4">
       <div class="feat-info">
         <div class="feat-name" data-i18n="minus_sign">Минус для расходов</div>
@@ -371,6 +382,15 @@
           <span class="opt-badge" data-i18n="optional_badge">опц.</span>
         </label>
         <select id="fAccount"></select>
+        <i class="bi bi-chevron-right si"></i>
+      </div>
+
+      <div class="frow" id="fTxnTypeWrap">
+        <label class="frow-lbl" for="fTxnType">
+          <span data-i18n="txntypes_section">Группы</span>
+          <span class="opt-badge" data-i18n="optional_badge">опц.</span>
+        </label>
+        <select id="fTxnType"></select>
         <i class="bi bi-chevron-right si"></i>
       </div>
 
@@ -505,6 +525,15 @@
       </div>
       <div class="feat-row">
         <div class="feat-info">
+          <div class="feat-name" data-i18n="txntypes_section">Группы</div>
+        </div>
+        <label class="tg-switch">
+          <input type="checkbox" id="sUseTxnTypes" onchange="toggleFeature('useTxnTypes', this.checked)">
+          <span class="tg-slider"></span>
+        </label>
+      </div>
+      <div class="feat-row">
+        <div class="feat-info">
           <div class="feat-name" data-i18n="minus_sign">Минус для расходов</div>
         </div>
         <label class="tg-switch">
@@ -554,6 +583,24 @@
       <button class="s-btn mb-1" onclick="restoreHiddenAccounts()">
         <i class="bi bi-eye"></i>
         <span data-i18n="accounts_restored">Восстановить скрытые счета</span>
+      </button>
+    </div>
+
+    <div id="settings-txntypes-wrap">
+      <div class="sec-hdr mt-3" data-i18n="txntypes_section">Группы</div>
+      <div class="new-cat-row">
+        <input type="text" id="sNewTxnType" class="new-cat-input"
+               data-i18n-placeholder="new_txntype_placeholder"
+               placeholder="Новая группа…"
+               onkeydown="if(event.key==='Enter') addListItem('txnTypes')">
+        <button class="new-cat-add" onclick="addListItem('txnTypes')">
+          <i class="bi bi-plus-lg"></i>
+        </button>
+      </div>
+      <div id="txnTypeSettingsList" class="cat-list mb-3"></div>
+      <button class="s-btn mb-1" onclick="restoreHiddenTxnTypes()">
+        <i class="bi bi-eye"></i>
+        <span data-i18n="txntypes_restored">Восстановить скрытые типы транзакции</span>
       </button>
     </div>
 
@@ -649,11 +696,14 @@ const S = {
   freq:     load('freq',{}),
   accounts:        load('accounts',[]),
   hiddenAccounts:  load('hiddenAccounts',[]),
+  txnTypes:      load('txnTypes',[]),
+  hiddenTxnTypes: load('hiddenTxnTypes',[]),
   subcats:         load('subcats',{}),
   hiddenSubcats:   load('hiddenSubcats',{}),
   settingsSubcatCat: '',
   useSubcats:      load('useSubcats', true),
   useAccounts:     load('useAccounts', true),
+  useTxnTypes:   load('useTxnTypes', false),
   minusSign:       load('minusSign', false),
   setupDone:       load('setupDone', false),
 };
@@ -727,9 +777,11 @@ function setupStep(step){
   } else if(step === 3){
     S.useSubcats = document.getElementById('iUseSubcats').checked;
     S.useAccounts = document.getElementById('iUseAccounts').checked;
+    S.useTxnTypes = document.getElementById('iUseTxnTypes').checked;
     S.minusSign = document.getElementById('iMinusSign').checked;
     save('useSubcats', S.useSubcats);
     save('useAccounts', S.useAccounts);
+    save('useTxnTypes', S.useTxnTypes);
     save('minusSign', S.minusSign);
     document.getElementById('features-prompt').style.display='none';
     document.getElementById('sheet-id-prompt').style.display='flex';
@@ -754,30 +806,36 @@ function toggleFeature(key, val){
 function applyFeatures(){
   const sSub = document.getElementById('settings-subcats-wrap');
   const sAcc = document.getElementById('settings-accounts-wrap');
+  const sGrp = document.getElementById('settings-txntypes-wrap');
   const fSub = document.getElementById('fSubcategoryWrap');
   const fAcc = document.getElementById('fAccountWrap');
-  
-  if(sSub) sSub.style.display = S.useSubcats ? 'block' : 'none';
+  const fGrp = document.getElementById('fTxnTypeWrap');
+
+  if(sSub) sSub.style.display = S.useSubcats  ? 'block' : 'none';
   if(sAcc) sAcc.style.display = S.useAccounts ? 'block' : 'none';
-  if(fSub) fSub.style.display = S.useSubcats ? 'flex' : 'none';
-  if(fAcc) fAcc.style.display = S.useAccounts ? 'flex' : 'none';
+  if(sGrp) sGrp.style.display = S.useTxnTypes   ? 'block' : 'none';
+  if(fSub) fSub.style.display = S.useSubcats  ? 'flex'  : 'none';
+  if(fAcc) fAcc.style.display = S.useAccounts ? 'flex'  : 'none';
+  if(fGrp) fGrp.style.display = S.useTxnTypes   ? 'flex'  : 'none';
 
   // Sync switches in settings
-  const swSub = document.getElementById('sUseSubcats');
-  const swAcc = document.getElementById('sUseAccounts');
+  const swSub   = document.getElementById('sUseSubcats');
+  const swAcc   = document.getElementById('sUseAccounts');
+  const swGrp   = document.getElementById('sUseTxnTypes');
   const swMinus = document.getElementById('sMinusSign');
-  if(swSub) swSub.checked = S.useSubcats;
-  if(swAcc) swAcc.checked = S.useAccounts;
+  if(swSub)   swSub.checked   = S.useSubcats;
+  if(swAcc)   swAcc.checked   = S.useAccounts;
+  if(swGrp)   swGrp.checked   = S.useTxnTypes;
   if(swMinus) swMinus.checked = S.minusSign;
 
   // Sync summary views
   const vSub = document.getElementById('viewSubcategory');
   const vAcc = document.getElementById('viewAccount');
-  if(vSub) vSub.style.display = S.useSubcats ? 'block' : 'none';
+  if(vSub) vSub.style.display = S.useSubcats  ? 'block' : 'none';
   if(vAcc) vAcc.style.display = S.useAccounts ? 'block' : 'none';
-  
-  if(!S.useSubcats && S.summaryView === 'subcategory') setSummaryView('category');
-  if(!S.useAccounts && S.summaryView === 'account') setSummaryView('category');
+
+  if(!S.useSubcats  && S.summaryView === 'subcategory') setSummaryView('category');
+  if(!S.useAccounts && S.summaryView === 'account')     setSummaryView('category');
 }
 
 function extractSheetId(s){const m=s.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);return m?m[1]:s.trim();}
@@ -900,6 +958,9 @@ function renderCategorySelect(){
 function activeAccounts(){
   return S.accounts.filter(a=>!(S.hiddenAccounts||[]).includes(a));
 }
+function activeTxnTypes(){
+  return S.txnTypes.filter(g=>!(S.hiddenTxnTypes||[]).includes(g));
+}
 function activeSubcats(cat){
   const all=S.subcats[cat]||[];
   const hid=S.hiddenSubcats[cat]||[];
@@ -909,6 +970,12 @@ function activeSubcats(cat){
 function renderAccountSelect(){
   const sel=document.getElementById('fAccount'), prev=sel.value, items=activeAccounts();
   sel.innerHTML=`<option value="">${esc(t('no_account'))}</option>`+items.map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join('');
+  if(items.includes(prev))sel.value=prev;
+}
+function renderTxnTypeSelect(){
+  const sel=document.getElementById('fTxnType'); if(!sel)return;
+  const prev=sel.value, items=activeTxnTypes();
+  sel.innerHTML=`<option value="">${esc(t('no_txntype'))}</option>`+items.map(g=>`<option value="${esc(g)}">${esc(g)}</option>`).join('');
   if(items.includes(prev))sel.value=prev;
 }
 function renderSubcatSelect(){
@@ -938,6 +1005,30 @@ function renderAccountSettingsList(){
       const dragging=list.querySelector('[style*="opacity"]');
       if(!dragging||dragging===row)return;
       reorderList('accounts',Number(dragging.dataset.index),Number(row.dataset.index));
+    });
+    list.appendChild(row);
+  });
+}
+function renderTxnTypeSettingsList(){
+  const items=activeTxnTypes(), list=document.getElementById('txnTypeSettingsList');
+  if(!list)return;
+  list.innerHTML='';
+  items.forEach((item,i)=>{
+    const row=document.createElement('div');
+    row.className='cat-item'; row.draggable=true; row.dataset.index=i;
+    row.innerHTML=`<span class="drag-handle"><i class="bi bi-grip-vertical"></i></span><span class="cat-label">${esc(item)}</span><button class="cat-action" title="${t('rename_title')}"><i class="bi bi-pencil"></i></button><button class="cat-action" title="${t('hide_title')}"><i class="bi bi-eye-slash"></i></button>`;
+    const[btnEdit,btnHide]=row.querySelectorAll('button');
+    btnEdit.addEventListener('click',()=>editListItem('txnTypes',item));
+    btnHide.addEventListener('click',()=>hideListItem('txnTypes',item));
+    row.addEventListener('dragstart',()=>{row._dragging=true;row.style.opacity='.4';});
+    row.addEventListener('dragend',()=>{row.style.opacity='';row._dragging=false;list.querySelectorAll('.cat-item').forEach(r=>r.style.background='');});
+    row.addEventListener('dragover',e=>{e.preventDefault();if(!row._dragging)row.style.background='rgba(0,122,255,.06)';});
+    row.addEventListener('dragleave',()=>{row.style.background='';});
+    row.addEventListener('drop',e=>{
+      e.preventDefault();row.style.background='';
+      const dragging=list.querySelector('[style*="opacity"]');
+      if(!dragging||dragging===row)return;
+      reorderList('txnTypes',Number(dragging.dataset.index),Number(row.dataset.index));
     });
     list.appendChild(row);
   });
@@ -989,6 +1080,12 @@ function reorderList(kind,fromI,toI){
     const hid=S.accounts.filter(a=>S.hiddenAccounts.includes(a));
     S.accounts=[...active,...hid]; save('accounts',S.accounts);
     renderAccountSettingsList(); renderAccountSelect();
+  } else if(kind==='txnTypes'){
+    const active=activeTxnTypes(), moved=active.splice(fromI,1)[0];
+    active.splice(toI,0,moved);
+    const hid=S.txnTypes.filter(g=>S.hiddenTxnTypes.includes(g));
+    S.txnTypes=[...active,...hid]; save('txnTypes',S.txnTypes);
+    renderTxnTypeSettingsList(); renderTxnTypeSelect();
   } else {
     const cat=document.getElementById('sSubcatCat')?.value; if(!cat)return;
     const active=activeSubcats(cat), moved=active.splice(fromI,1)[0];
@@ -1004,6 +1101,10 @@ function hideListItem(kind,name){
     if(!S.hiddenAccounts.includes(name))S.hiddenAccounts.push(name);
     save('hiddenAccounts',S.hiddenAccounts);
     renderAccountSettingsList(); renderAccountSelect();
+  } else if(kind==='txnTypes'){
+    if(!S.hiddenTxnTypes.includes(name))S.hiddenTxnTypes.push(name);
+    save('hiddenTxnTypes',S.hiddenTxnTypes);
+    renderTxnTypeSettingsList(); renderTxnTypeSelect();
   } else {
     const cat=document.getElementById('sSubcatCat')?.value; if(!cat)return;
     if(!S.hiddenSubcats[cat])S.hiddenSubcats[cat]=[];
@@ -1017,6 +1118,10 @@ function restoreHiddenAccounts(){
   S.hiddenAccounts=[]; save('hiddenAccounts',S.hiddenAccounts);
   renderAccountSettingsList(); renderAccountSelect(); showToast(t('accounts_restored'));
 }
+function restoreHiddenTxnTypes(){
+  S.hiddenTxnTypes=[]; save('hiddenTxnTypes',S.hiddenTxnTypes);
+  renderTxnTypeSettingsList(); renderTxnTypeSelect(); showToast(t('txntypes_restored'));
+}
 function restoreHiddenSubcats(){
   const cat=document.getElementById('sSubcatCat')?.value;
   if(cat){S.hiddenSubcats[cat]=[];}else{S.hiddenSubcats={};}
@@ -1025,7 +1130,7 @@ function restoreHiddenSubcats(){
 }
 
 async function addListItem(kind){
-  const inputId=kind==='accounts'?'sNewAccount':'sNewSubcat';
+  const inputId=kind==='accounts'?'sNewAccount':kind==='txnTypes'?'sNewTxnType':'sNewSubcat';
   const input=document.getElementById(inputId), name=input.value.trim();
   if(!name)return;
   if(kind==='accounts'){
@@ -1042,6 +1147,20 @@ async function addListItem(kind){
     }
     S.accounts=[...S.accounts,name]; save('accounts',S.accounts);
     renderAccountSettingsList(); renderAccountSelect(); showToast(t('account_added'));
+  } else if(kind==='txnTypes'){
+    const existing=S.txnTypes;
+    const dup=existing.find(c=>c.toLowerCase()===name.toLowerCase());
+    if(dup){showToast(t('item_exists')(dup),'warning');return;}
+    input.disabled=true;
+    if(S.spreadsheetId){
+      try{
+        const res=await apiGet({action:'addListItem',spreadsheetId:S.spreadsheetId,list:'txnTypes',name});
+        if(res.status==='duplicate'){showToast(t('item_exists')(res.existing),'warning');input.disabled=false;return;}
+        if(res.status!=='ok')throw new Error(res.message);
+      }catch(e){showToast(t('error_prefix')+e.message,'error');input.disabled=false;return;}
+    }
+    S.txnTypes=[...S.txnTypes,name]; save('txnTypes',S.txnTypes);
+    renderTxnTypeSettingsList(); renderTxnTypeSelect(); showToast(t('txntype_added'));
   } else {
     const cat=document.getElementById('sSubcatCat')?.value;
     if(!cat){showToast(t('select_cat_for_subcats'),'warning');return;}
@@ -1082,6 +1201,22 @@ async function editListItem(kind,oldName){
     const hidIdx=S.hiddenAccounts.indexOf(oldName);
     if(hidIdx!==-1){S.hiddenAccounts[hidIdx]=newName;save('hiddenAccounts',S.hiddenAccounts);}
     renderAccountSettingsList(); renderAccountSelect();
+  } else if(kind==='txnTypes'){
+    const existing=S.txnTypes;
+    const dup=existing.find(c=>c.toLowerCase()===newName.toLowerCase()&&c!==oldName);
+    if(dup){showToast(t('item_exists')(dup),'warning');return;}
+    if(S.spreadsheetId){
+      try{
+        const res=await apiGet({action:'renameListItem',spreadsheetId:S.spreadsheetId,list:'txnTypes',oldName,newName});
+        if(res.status==='duplicate'){showToast(t('item_exists')(res.existing),'warning');return;}
+        if(res.status!=='ok')throw new Error(res.message);
+      }catch(e){showToast(t('error_prefix')+e.message,'error');return;}
+    }
+    const idx=S.txnTypes.indexOf(oldName);
+    if(idx!==-1){S.txnTypes[idx]=newName;save('txnTypes',S.txnTypes);}
+    const hidIdx=S.hiddenTxnTypes.indexOf(oldName);
+    if(hidIdx!==-1){S.hiddenTxnTypes[hidIdx]=newName;save('hiddenTxnTypes',S.hiddenTxnTypes);}
+    renderTxnTypeSettingsList(); renderTxnTypeSelect();
   } else {
     const cat=document.getElementById('sSubcatCat')?.value; if(!cat)return;
     const existing=S.subcats[cat]||[];
@@ -1116,6 +1251,18 @@ async function syncAccounts(){
     renderAccountSelect(); renderAccountSettingsList();
   }catch{}
 }
+async function syncTxnTypes(){
+  if(!S.spreadsheetId)return;
+  try{
+    const res=await apiGet({action:'getTxnTypes',spreadsheetId:S.spreadsheetId});
+    if(res.status!=='ok')return;
+    const sheet=res.values, hidden=S.hiddenTxnTypes||[], current=S.txnTypes;
+    const newGroups=[...current.filter(v=>sheet.some(s=>s.toLowerCase()===v.toLowerCase())),...sheet.filter(s=>!current.some(c=>c.toLowerCase()===s.toLowerCase())&&!hidden.some(h=>h.toLowerCase()===s.toLowerCase()))];
+    if(JSON.stringify(newGroups)===JSON.stringify(S.txnTypes))return;
+    S.txnTypes=newGroups; save('txnTypes',S.txnTypes);
+    renderTxnTypeSelect(); renderTxnTypeSettingsList();
+  }catch{}
+}
 async function syncSubcats(){
   if(!S.spreadsheetId)return;
   try{
@@ -1145,6 +1292,7 @@ async function submitForm(){
   const amount     =document.getElementById('fAmount').value.replace(/\s/g,'').replace(',','.');
   const subcategory=document.getElementById('fSubcategory').value.trim();
   const account    =document.getElementById('fAccount').value.trim();
+  const txnType   =document.getElementById('fTxnType').value.trim();
   const note       =document.getElementById('fNote').value.trim();
 
   if(!date||!category||!amount){showToast(t('fill_required'),'warning');return;}
@@ -1155,20 +1303,21 @@ async function submitForm(){
   btn.classList.add('loading');
   try{
     if(date===todayStr()){
-      const dup=await apiGet({action:'checkDuplicate',spreadsheetId:S.spreadsheetId,date,amount,category,subcategory,note,account,userName:S.userName||'',type:S.expenseType});
+      const dup=await apiGet({action:'checkDuplicate',spreadsheetId:S.spreadsheetId,date,amount,category,subcategory,note,account,txnType,userName:S.userName||'',type:S.expenseType});
       if(dup.duplicate){
         btn.disabled=false;btn.classList.remove('loading');
         try{await confirmDuplicate();}catch{return;}
         btn.disabled=true;btn.classList.add('loading');
       }
     }
-    await doSave(date,category,subcategory,amount,account,note);
+    await doSave(date,category,subcategory,amount,account,txnType,note);
     if(!S.freq[S.expenseType])S.freq[S.expenseType]={};
     S.freq[S.expenseType][category]=(S.freq[S.expenseType][category]||0)+1;
     save('freq',S.freq);
     document.getElementById('fAmount').value='';
     document.getElementById('fSubcategory').value='';
     document.getElementById('fAccount').value='';
+    document.getElementById('fTxnType').value='';
     document.getElementById('fNote').value='';
     renderQuickCats();
     showToast(S.expenseType==='outflow'?t('expense_saved'):t('inflow_saved'));
@@ -1190,12 +1339,12 @@ function confirmDuplicate(){
   });
 }
 
-async function doSave(date,category,subcategory,amount,account,note){
+async function doSave(date,category,subcategory,amount,account,txnType,note){
   let finalAmount = amount;
   if(S.minusSign && S.expenseType === 'outflow') {
     finalAmount = -Math.abs(amount);
   }
-  const res=await apiGet({action:'addRecord',spreadsheetId:S.spreadsheetId,date,category,subcategory,amount:finalAmount,account,note,type:S.expenseType,firstName:S.tgUser?.first_name||'',lastName:S.tgUser?.last_name||'',username:S.tgUser?.username||'',userName:S.userName||''});
+  const res=await apiGet({action:'addRecord',spreadsheetId:S.spreadsheetId,date,category,subcategory,amount:finalAmount,account,txnType,note,type:S.expenseType,firstName:S.tgUser?.first_name||'',lastName:S.tgUser?.last_name||'',username:S.tgUser?.username||'',userName:S.userName||''});
   if(res.status!=='ok')throw new Error(res.message||'Server error');
 }
 
@@ -1396,8 +1545,9 @@ function saveSheetId(){
   document.getElementById('no-id-banner').style.display='none';
   S.catCache={}; save('catCache',{});
   S.accounts=[]; save('accounts',[]); S.hiddenAccounts=[]; save('hiddenAccounts',[]);
+  S.txnTypes=[];   save('txnTypes',[]);   S.hiddenTxnTypes=[];   save('hiddenTxnTypes',[]);
   S.subcats={};  save('subcats',{}); S.hiddenSubcats={};  save('hiddenSubcats',{});
-  Promise.all([syncCategories('outflow'),syncCategories('inflow'),syncAccounts(),syncSubcats()])
+  Promise.all([syncCategories('outflow'),syncCategories('inflow'),syncAccounts(),syncTxnTypes(),syncSubcats()])
     .then(()=>{showToast(t('table_connected'));renderCatList();})
     .catch(()=>showToast(t('sync_error'),'error'));
 }
@@ -1500,6 +1650,7 @@ function startApp(){
   applyLang();
   document.getElementById('fDate').value=todayStr();
   renderAccountSelect();
+  renderTxnTypeSelect();
   renderSubcatSelect();
   setSettingsCatType(S.settingsCatType);
   applyFeatures();
@@ -1512,7 +1663,7 @@ function startApp(){
     hint.textContent='ID: '+S.spreadsheetId; hint.style.display='block';
   }else{document.getElementById('no-id-banner').style.display='block';}
   setType(S.expenseType);
-  if(S.spreadsheetId){syncCategories('outflow');syncCategories('inflow');syncAccounts();syncSubcats();}
+  if(S.spreadsheetId){syncCategories('outflow');syncCategories('inflow');syncAccounts();syncTxnTypes();syncSubcats();}
 
   // Keyboard focus handling
   const scrollIntoView = (el) => {

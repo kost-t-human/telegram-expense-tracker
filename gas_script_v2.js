@@ -26,12 +26,22 @@
 // ══════════════════════════════════════════════════════════════
 // You can reorder these fields to change the column order in the "Records" sheet.
 // Ensure you have at least 'date', 'amount', 'category', and 'type' for the app to function correctly.
+//
+// OPTIONAL FIELDS — comment/uncomment to enable or disable per instance:
+//   'month'  — month number extracted from date (1–12)
+//   'day'    — day number extracted from date (1–31)
+//   'txnType'  — transaction type (Revenue / Expense / Deposit / Transfer / Refund etc.)
+//              Maps to "Catecory" column in VS Tracker template.
+//              Enable in the app by passing &txnType=Revenue in addRecord calls.
+//
 const RECORD_COLUMNS = [
   'timestamp',   // Row creation time
-  'date',        // Purchase date (YYYY-MM-DD)
+  // 'month',    // Month number extracted from date (1–12)  ← optional
+  'date',        // Purchase date → "Day" column in sheet (YYYY-MM-DD)
   'amount',      // Transaction amount
-  'category',    // Main category
-  'subcategory', // Optional subcategory
+  // 'txnType',    // Top-level group label (Revenue / Expense etc.) ← optional
+  'category',    // Category 2 in VS Tracker
+  'subcategory', // Category 3 in VS Tracker
   'description', // Note / Description
   'account',     // Account / Wallet
   'name',        // User name (from settings or TG)
@@ -41,10 +51,12 @@ const RECORD_COLUMNS = [
 // Display names for the headers (you can rename these if you like)
 const COLUMN_DISPLAY_NAMES = {
   'timestamp':   'Timestamp',
-  'date':        'Date',
+  'month':       'Month',
+  'date':        'Day',
   'amount':      'Amount',
-  'category':    'Category',
-  'subcategory': 'Subcategory',
+  'txnType':     'Transaction Type',
+  'category':    'Category 2',
+  'subcategory': 'Category 3',
   'description': 'Description',
   'account':     'Account',
   'name':        'Name',
@@ -55,6 +67,7 @@ const COLUMN_DISPLAY_NAMES = {
 const SH_OUTFLOWS   = 'Records';
 const SH_CATEGORIES = 'Categories';
 const SH_ACCOUNTS   = 'Accounts';
+const SH_TXNTYPES   = 'Transaction Types';
 const SH_SUBCATS    = 'Subcategories';
 const SH_USERS      = 'Users';
 
@@ -62,6 +75,7 @@ const SH_USERS      = 'Users';
 const HDR_OUTFLOWS   = RECORD_COLUMNS.map(key => COLUMN_DISPLAY_NAMES[key] || key);
 const HDR_CATEGORIES = ['Name','Type','Order'];
 const HDR_ACCOUNTS   = ['Name','Order'];
+const HDR_TXNTYPES   = ['Name','Order'];
 const HDR_SUBCATS    = ['Name','Category','Order'];
 const HDR_USERS      = ['Name','First name','Last name','Username','Date added'];
 
@@ -94,6 +108,7 @@ function doGet(e) {
       case 'addCategory':    return addCategory(ss, p);
       case 'renameCategory': return renameCategory(ss, p);
       case 'getAccounts':    return getListSheet(ss, SH_ACCOUNTS, HDR_ACCOUNTS);
+      case 'getTxnTypes':     return getListSheet(ss, SH_TXNTYPES,   HDR_TXNTYPES);
       case 'getSubcats':     return getSubcats(ss);
       case 'addListItem':    return addListItemAction(ss, p);
       case 'renameListItem': return renameListItemAction(ss, p);
@@ -273,10 +288,12 @@ function addListItemAction(ss, p) {
   const list = String(p.list || '');
   if (!name) return err('name required');
 
-  if (list === 'accounts') {
-    const sheet = getOrCreateSheet(ss, SH_ACCOUNTS, HDR_ACCOUNTS);
-    const rows  = sheetData(sheet, 1, 1);
-    const dup   = rows.find(r => String(r[0]).trim().toLowerCase() === name.toLowerCase());
+  if (list === 'accounts' || list === 'txnTypes') {
+    const shName = list === 'accounts' ? SH_ACCOUNTS : SH_TXNTYPES;
+    const hdr    = list === 'accounts' ? HDR_ACCOUNTS : HDR_TXNTYPES;
+    const sheet  = getOrCreateSheet(ss, shName, hdr);
+    const rows   = sheetData(sheet, 1, 1);
+    const dup    = rows.find(r => String(r[0]).trim().toLowerCase() === name.toLowerCase());
     if (dup) return json({ status: 'duplicate', existing: String(dup[0]).trim() });
     const orders  = sheetData(sheet, 1, 2).map(r => Number(r[1]) || 0);
     const nextOrder = orders.length ? Math.max(...orders) + 1 : 1;
@@ -305,8 +322,9 @@ function renameListItemAction(ss, p) {
   const list    = String(p.list || '');
   if (!oldName || !newName) return err('oldName and newName required');
 
-  if (list === 'accounts') {
-    const sheet = ss.getSheetByName(SH_ACCOUNTS);
+  if (list === 'accounts' || list === 'txnTypes') {
+    const shName = list === 'accounts' ? SH_ACCOUNTS : SH_TXNTYPES;
+    const sheet  = ss.getSheetByName(shName);
     if (!sheet) return err('Sheet not found');
     const rows = sheetData(sheet, 1, 1);
     const dup  = rows.find(r => String(r[0]).trim().toLowerCase() === newName.toLowerCase() && String(r[0]).trim() !== oldName);
@@ -408,17 +426,23 @@ function addRecord(ss, p) {
   const type        = String(p.type         || 'outflow');
   const subcategory = String(p.subcategory  || '').trim();
   const account     = String(p.account      || '').trim();
+  const txnType  = String(p.txnType        || '').trim();
 
   const userName = upsertUser(ss, firstName, lastName, username, p.userName);
 
   const category = String(p.category || '').trim();
   if (account)     upsertListItem(ss, SH_ACCOUNTS, HDR_ACCOUNTS, account);
+  if (txnType)       upsertListItem(ss, SH_TXNTYPES,   HDR_TXNTYPES,   txnType);
   if (subcategory) { migrateSubcatsSheet(ss); upsertListItem(ss, SH_SUBCATS, HDR_SUBCATS, subcategory, category); }
 
   let purchaseDate = '';
+  let purchaseMonth = '';
   if (p.date) {
     const [y, m, d] = String(p.date).split('-').map(Number);
-    if (y && m && d) purchaseDate = new Date(y, m - 1, d);
+    if (y && m && d) {
+      purchaseDate  = new Date(y, m - 1, d);
+      purchaseMonth = m;
+    }
   }
 
   const amount = p.amount !== undefined ? Number(p.amount) : '';
@@ -427,8 +451,10 @@ function addRecord(ss, p) {
   const rowData = RECORD_COLUMNS.map(key => {
     switch(key) {
       case 'timestamp':   return new Date();
+      case 'month':       return purchaseMonth;
       case 'date':        return purchaseDate;
       case 'amount':      return amount;
+      case 'txnType':       return txnType;
       case 'category':    return p.category || '';
       case 'subcategory': return subcategory;
       case 'description': return p.note || '';
@@ -453,6 +479,7 @@ function checkDuplicate(ss, p) {
   const subcategory = String(p.subcategory || '').trim().toLowerCase();
   const note        = String(p.note        || '').trim().toLowerCase();
   const account     = String(p.account     || '').trim().toLowerCase();
+  const txnType  = String(p.txnType       || '').trim().toLowerCase();
   const userName    = String(p.userName     || '');
   const type        = String(p.type        || 'outflow');
   const tz          = Session.getScriptTimeZone();
@@ -476,6 +503,7 @@ function checkDuplicate(ss, p) {
       String(row[colIdxMap['subcategory']] || '').trim().toLowerCase() === subcategory &&
       String(row[colIdxMap['description']] || '').trim().toLowerCase() === note &&
       String(row[colIdxMap['account']] || '').trim().toLowerCase() === account &&
+      (colIdxMap['txnType'] === undefined || String(row[colIdxMap['txnType']] || '').trim().toLowerCase() === txnType) &&
       String(row[colIdxMap['type']] || 'outflow') === type &&
       (!userName || String(row[colIdxMap['name']]) === userName)
     ) count++;
