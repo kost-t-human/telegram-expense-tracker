@@ -532,13 +532,15 @@ function checkDuplicate(ss, p) {
 }
 
 // ══════════════════════════════════════════════════════════════
-// Date resolution: timestamp → date → month
+// Date resolution: date → timestamp → month
 // ══════════════════════════════════════════════════════════════
 
 // Returns the best available Date for a row, trying columns in priority order.
+// 'date' (purchase date) wins over 'timestamp' (row creation time) so stats
+// group by when the purchase happened, not when it was entered.
 // month column format: "05 May" (no year) — current year assumed as last resort.
 function getRowDate(row, colIdxMap) {
-  for (const key of ['timestamp', 'date']) {
+  for (const key of ['date', 'timestamp']) {
     if (colIdxMap[key] === undefined) continue;
     const v = row[colIdxMap[key]];
     if (v instanceof Date && !isNaN(v)) return v;
