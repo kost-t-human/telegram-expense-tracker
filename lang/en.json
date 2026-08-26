@@ -15,14 +15,12 @@
   "save": "Save",
   "month": "Month",
   "year": "Year",
-  "prev": "Prev.",
   "current": "Current",
   "no_records": "No records for this period",
   "setup_table": "Set up your table in ⚙ Settings",
   "expenses_title": "Outflow",
   "inflow_title": "Inflow",
   "balance": "Balance",
-  "no_data": "No data",
   "google_table": "Google Sheets Table",
   "table_placeholder": "Link or Table ID",
   "save_sync": "Save and sync",
@@ -105,5 +103,6 @@
   "txntype_added": "Transaction type added",
   "txntypes_restored": "Hidden types restored",
   "no_txntype": "— none —",
-  "txntype": "Txn Type"
+  "item_exists": "\"{name}\" is already in the list",
+  "cat_exists": "Category \"{name}\" already exists"
 }

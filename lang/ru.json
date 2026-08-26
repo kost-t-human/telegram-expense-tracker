@@ -15,14 +15,12 @@
   "save": "Сохранить",
   "month": "Месяц",
   "year": "Год",
-  "prev": "Предыд.",
   "current": "Текущий",
   "no_records": "Нет записей за этот период",
   "setup_table": "Настройте таблицу в ⚙ Настройках",
   "expenses_title": "Расходы",
   "inflow_title": "Доходы",
   "balance": "Баланс",
-  "no_data": "Нет данных",
   "google_table": "Таблица Google Sheets",
   "table_placeholder": "Ссылка или ID таблицы",
   "save_sync": "Сохранить и синхронизировать",
@@ -105,5 +103,6 @@
   "txntype_added": "Вид операции добавлен",
   "txntypes_restored": "Скрытые виды восстановлены",
   "no_txntype": "— не выбрано —",
-  "txntype": "Вид операции"
+  "item_exists": "«{name}» уже есть в списке",
+  "cat_exists": "Категория «{name}» уже есть"
 }

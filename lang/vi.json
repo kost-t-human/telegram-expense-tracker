@@ -15,14 +15,12 @@
   "save": "Lưu",
   "month": "Tháng",
   "year": "Năm",
-  "prev": "Trước",
   "current": "Hiện tại",
   "no_records": "Không có dữ liệu cho kỳ này",
   "setup_table": "Thiết lập bảng tính trong ⚙ Cài đặt",
   "expenses_title": "Khoản chi",
   "inflow_title": "Khoản thu",
   "balance": "Số dư",
-  "no_data": "Không có dữ liệu",
   "google_table": "Bảng tính Google Sheets",
   "table_placeholder": "Liên kết hoặc ID bảng tính",
   "save_sync": "Lưu và đồng bộ",
@@ -105,5 +103,6 @@
   "txntype_added": "Đã thêm loại giao dịch",
   "txntypes_restored": "Đã khôi phục loại ẩn",
   "no_txntype": "— chưa chọn —",
-  "txntype": "Loại GD"
+  "item_exists": "\"{name}\" đã có trong danh sách",
+  "cat_exists": "Danh mục \"{name}\" đã tồn tại"
 }
