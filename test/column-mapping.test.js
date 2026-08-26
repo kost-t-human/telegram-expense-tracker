@@ -39,19 +39,24 @@ const check = (name, actual, expected) => {
 check('a sheet this script created maps to its own layout',
   recordColIdx(fakeSheet(defaultHeaders)), positional);
 
-// The layout of the second bot: Description and Category 3 the other way round.
-const swapped = ['Timestamp', 'Day', 'Amount', 'Category 2', 'Description', 'Category 3', 'Account', 'Name', 'Type'];
+// A sheet laid out the other way round: Category 3 before Description.
+const swapped = ['Timestamp', 'Day', 'Amount', 'Category 2', 'Category 3', 'Description', 'Account', 'Name', 'Type'];
 const bySwapped = recordColIdx(fakeSheet(swapped));
-check('a differently ordered sheet is read by its headers',
-  [bySwapped.description, bySwapped.subcategory], [4, 5]);
+check('a differently ordered sheet is read by its headers, not by RECORD_COLUMNS',
+  [bySwapped.subcategory, bySwapped.description], [4, 5]);
 check('the fields the summary needs still resolve',
   [bySwapped.date, bySwapped.amount, bySwapped.category, bySwapped.type], [1, 2, 3, 8]);
+check('and that is genuinely not the configured order',
+  [positional.subcategory, positional.description], [5, 4]);
 
 check('headers are matched regardless of case and padding',
   recordColIdx(fakeSheet(defaultHeaders.map(h => ' ' + h.toUpperCase() + ' '))), positional);
 
-check('unmatched headers fall back to the configured order rather than guessing',
-  recordColIdx(fakeSheet(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'])), positional);
+// Headers in another language: the deployment's own RECORD_COLUMNS is all
+// there is to go by, which is why it has to match the sheet.
+check('headers in another language fall back to the configured order',
+  recordColIdx(fakeSheet(['Отметка времени', 'Дата', 'Сумма', 'Категория', 'Описание',
+                          'Подкатегория', 'Счёт', 'Имя', 'Тип'])), positional);
 
 check('an empty sheet falls back to the configured order',
   recordColIdx(fakeSheet([])), positional);
@@ -61,4 +66,4 @@ check('rows span the whole sheet, including columns this script does not know',
   recordWidth(fakeSheet(defaultHeaders.concat(['Budget', 'Notes']))), RECORD_COLUMNS.length + 2);
 
 if (failed) process.exit(1);
-console.log('column mapping: 7 checks OK');
+console.log('column mapping: 8 checks OK');

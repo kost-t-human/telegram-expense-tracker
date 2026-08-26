@@ -28,32 +28,39 @@
 // ══════════════════════════════════════════════════════════════
 // 1. COLUMN CONFIGURATION (RECORD ORDER)
 // ══════════════════════════════════════════════════════════════
-// You can reorder these fields to change the column order in the "Records" sheet.
+// PER-DEPLOYMENT CONFIGURATION — keep this block matching the spreadsheet this
+// deployment writes to, and leave it as it is when pasting an updated script.
+//
+// It sets the column order of a newly created "Records" sheet, and it is what
+// an existing sheet is read by whenever its headers cannot be matched against
+// COLUMN_DISPLAY_NAMES — which is the case for a sheet whose headers are in
+// another language. Get it wrong there and amounts and dates are read from the
+// neighbouring columns.
+//
 // Ensure you have at least 'date', 'amount', 'category', and 'type' for the app to function correctly.
 //
 // OPTIONAL FIELDS — comment/uncomment to enable or disable per instance:
 //   'month'  — month number extracted from date (1–12)
-//   'day'    — day number extracted from date (1–31)
 //   'txnType'  — transaction type (Revenue / Expense / Deposit / Transfer / Refund etc.)
 //              Maps to "Catecory" column in VS Tracker template.
 //              Enable in the app by passing &txnType=Revenue in addRecord calls.
 //
 const RECORD_COLUMNS = [
   'timestamp',   // Row creation time
-  // 'month',    // Month number extracted from date (1–12)  ← optional
-  'date',        // Purchase date → "Day" column in sheet (YYYY-MM-DD)
+  'date',        // Purchase date (YYYY-MM-DD)
   'amount',      // Transaction amount
-  // 'txnType',    // Top-level group label (Revenue / Expense etc.) ← optional
-  'category',    // Category 2 in VS Tracker
-  'subcategory', // Category 3 in VS Tracker
+  'category',    // Main category
   'description', // Note / Description
+  'subcategory', // Optional subcategory
   'account',     // Account / Wallet
   'name',        // User name (from settings or TG)
+  // 'txnType',  // Top-level group label (Revenue / Expense etc.)  ← optional
+  // 'month',    // Month number extracted from date (1–12)         ← optional
   'type'         // "outflow" or "inflow"
 ];
 // Bump when deploying a new version — `?action=diag` reports it back, which is
 // the only way to tell a live deployment apart from an outdated one.
-const SCRIPT_VERSION = '2.2.0';
+const SCRIPT_VERSION = '2.2.1';
 
 // ── Sheet names ────────────────────────────────────────────────
 const SH_OUTFLOWS   = 'Records';

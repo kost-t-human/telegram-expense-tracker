@@ -95,11 +95,16 @@ created** `Records` sheet: reorder the list to reorder them, comment entries in
 and out to drop the optional ones.
 
 A sheet that already exists keeps the order it was created with. Reads and
-writes resolve each field from the header row, so one script can serve several
-bots whose spreadsheets are laid out differently, and columns of your own added
-to the right of the sheet are left alone. If the headers cannot be matched — you
-renamed them, or the sheet was not created by this script — it falls back to the
-`RECORD_COLUMNS` order, and then that order does have to match the sheet.
+writes resolve each field from the header row, matching it against
+`COLUMN_DISPLAY_NAMES`, so one script can serve several bots whose spreadsheets
+are laid out differently, and columns of your own added to the right are left
+alone.
+
+When the headers cannot be matched — they are in another language, or you
+renamed them — it falls back to the `RECORD_COLUMNS` order, and then that order
+*must* match the sheet. Keep the block matching the spreadsheet of that
+deployment and leave it alone when pasting an updated script, or translate
+`COLUMN_DISPLAY_NAMES` to your headers to have them matched instead.
 `?action=diag` reports which mapping is in effect.
 
 `date` holds the purchase date and drives every summary; `timestamp` only
