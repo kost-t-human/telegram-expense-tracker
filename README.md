@@ -90,11 +90,20 @@ from a spreadsheet whose columns are not what the script expects.
 
 ## Spreadsheet layout
 
-Records are written to the `Records` sheet in the order given by
-`RECORD_COLUMNS` in `apps-script/Code.gs`. Reorder that list to reorder the
-columns, or comment entries in and out to drop optional ones — headers, writes
-and statistics all follow it. `date` holds the purchase date and drives every
-summary; `timestamp` only records when the row was entered.
+`RECORD_COLUMNS` in `apps-script/Code.gs` defines the columns of a **newly
+created** `Records` sheet: reorder the list to reorder them, comment entries in
+and out to drop the optional ones.
+
+A sheet that already exists keeps the order it was created with. Reads and
+writes resolve each field from the header row, so one script can serve several
+bots whose spreadsheets are laid out differently, and columns of your own added
+to the right of the sheet are left alone. If the headers cannot be matched — you
+renamed them, or the sheet was not created by this script — it falls back to the
+`RECORD_COLUMNS` order, and then that order does have to match the sheet.
+`?action=diag` reports which mapping is in effect.
+
+`date` holds the purchase date and drives every summary; `timestamp` only
+records when the row was entered.
 
 `Categories`, `Accounts`, `Transaction Types`, `Subcategories` and `Users` are
 created and maintained by the script.
@@ -127,6 +136,7 @@ key itself, so a partial translation degrades instead of breaking.
 
 ```sh
 node test/date-resolution.test.js   # summaries group by purchase date
+node test/column-mapping.test.js    # fields resolve to the right columns
 node test/wiring.test.js            # markup and app.js still agree
 ```
 

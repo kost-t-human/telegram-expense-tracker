@@ -53,7 +53,7 @@ const RECORD_COLUMNS = [
 ];
 // Bump when deploying a new version — `?action=diag` reports it back, which is
 // the only way to tell a live deployment apart from an outdated one.
-const SCRIPT_VERSION = '2.1.0';
+const SCRIPT_VERSION = '2.2.0';
 
 // ── Sheet names ────────────────────────────────────────────────
 const SH_OUTFLOWS   = 'Records';
@@ -94,6 +94,45 @@ const HDR_USERS      = ['Name','First name','Last name','Username','Date added']
 // Helper to get column index by field key (0-based)
 function getColIdx(key) {
   return RECORD_COLUMNS.indexOf(key);
+}
+
+// Fields without which a row cannot be read or written correctly.
+const REQUIRED_COLUMNS = ['date', 'amount', 'category', 'type'];
+
+// Where each field actually sits in an existing "Records" sheet, resolved from
+// the header row rather than from RECORD_COLUMNS.
+//
+// RECORD_COLUMNS describes the layout this deployment *creates*; a sheet that
+// already exists keeps the order it was created with, and different bots
+// sharing this script do not have the same one. Trusting the constant would
+// read amounts and dates out of whichever columns happen to sit at those
+// positions. Falls back to the constant when the headers cannot be matched —
+// a renamed header, or a sheet this script never created.
+function recordColIdx(sheet) {
+  const positional = {};
+  RECORD_COLUMNS.forEach(function (key, i) { positional[key] = i; });
+  if (!sheet || sheet.getLastRow() < 1) return positional;
+
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
+    .map(function (h) { return String(h).trim().toLowerCase(); });
+
+  const byHeader = {};
+  RECORD_COLUMNS.forEach(function (key) {
+    const i = headers.indexOf(String(COLUMN_DISPLAY_NAMES[key] || key).toLowerCase());
+    if (i !== -1) byHeader[key] = i;
+  });
+
+  // A partial match would be worse than the constant: it mixes resolved and
+  // assumed positions in the same row.
+  const complete = REQUIRED_COLUMNS.every(function (key) { return byHeader[key] !== undefined; });
+  return complete ? byHeader : positional;
+}
+
+// Width to read/write: whatever the sheet has, so trailing columns this script
+// does not know about are preserved instead of truncating the row.
+function recordWidth(sheet) {
+  // Capped at the grid width: getRange() past it throws.
+  return Math.min(Math.max(sheet.getLastColumn(), RECORD_COLUMNS.length), sheet.getMaxColumns());
 }
 
 // ── Default categories ─────────────────────────────────────────
@@ -463,22 +502,27 @@ function addRecord(ss, p) {
 
   const amount = p.amount !== undefined ? Number(p.amount) : '';
 
-  // Prepare row data based on RECORD_COLUMNS configuration
-  const rowData = RECORD_COLUMNS.map(key => {
-    switch(key) {
-      case 'timestamp':   return new Date();
-      case 'month':       return purchaseMonth;
-      case 'date':        return purchaseDate;
-      case 'amount':      return amount;
-      case 'txnType':       return txnType;
-      case 'category':    return p.category || '';
-      case 'subcategory': return subcategory;
-      case 'description': return p.note || '';
-      case 'account':     return account;
-      case 'name':        return userName;
-      case 'type':        return type;
-      default:            return '';
-    }
+  const values = {
+    timestamp:   new Date(),
+    month:       purchaseMonth,
+    date:        purchaseDate,
+    amount:      amount,
+    txnType:     txnType,
+    category:    p.category || '',
+    subcategory: subcategory,
+    description: p.note || '',
+    account:     account,
+    name:        userName,
+    type:        type
+  };
+
+  // Placed by the sheet's own column order, not by RECORD_COLUMNS.
+  const colIdxMap = recordColIdx(sheet);
+  const numCols = recordWidth(sheet);
+  const rowData = new Array(numCols).fill('');
+  RECORD_COLUMNS.forEach(function (key) {
+    const i = colIdxMap[key];
+    if (i !== undefined && i < numCols) rowData[i] = values[key];
   });
 
   sheet.appendRow(rowData);
@@ -486,7 +530,6 @@ function addRecord(ss, p) {
   // Copy formatting + data validation from the row above (if it exists)
   const newRow = sheet.getLastRow();
   if (newRow > 2) {
-    const numCols = RECORD_COLUMNS.length;
     const srcRange = sheet.getRange(newRow - 1, 1, 1, numCols);
     const dstRange = sheet.getRange(newRow, 1, 1, numCols);
     srcRange.copyTo(dstRange, SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false);
@@ -512,13 +555,12 @@ function checkDuplicate(ss, p) {
   const tz          = Session.getScriptTimeZone();
 
   const lastRow = sheet.getLastRow();
-  const numCols = HDR_OUTFLOWS.length;
+  const numCols = recordWidth(sheet);
   const startRow = Math.max(2, lastRow - 9); // last 10 data rows
   const rows = sheet.getRange(startRow, 1, lastRow - startRow + 1, numCols).getValues();
   let count = 0;
 
-  const colIdxMap = {};
-  RECORD_COLUMNS.forEach((key, i) => colIdxMap[key] = i);
+  const colIdxMap = recordColIdx(sheet);
 
   for (const row of rows) {
     const d = getRowDate(row, colIdxMap);
@@ -602,14 +644,15 @@ function diag(ss) {
   const sheet = ss && ss.getSheetByName(SH_OUTFLOWS);
   if (!sheet || sheet.getLastRow() < 2) return json(out);
 
-  const colIdxMap = {};
-  RECORD_COLUMNS.forEach(function (key, i) { colIdxMap[key] = i; });
+  const colIdxMap = recordColIdx(sheet);
+  out.resolvedColumns = colIdxMap;
 
   const tz = Session.getScriptTimeZone();
   const lastRow = sheet.getLastRow();
   const startRow = Math.max(2, lastRow - 2); // last 3 records is enough to tell
-  out.headers = sheet.getRange(1, 1, 1, HDR_OUTFLOWS.length).getValues()[0];
-  out.rows = sheet.getRange(startRow, 1, lastRow - startRow + 1, HDR_OUTFLOWS.length)
+  const numCols = recordWidth(sheet);
+  out.headers = sheet.getRange(1, 1, 1, numCols).getValues()[0];
+  out.rows = sheet.getRange(startRow, 1, lastRow - startRow + 1, numCols)
     .getValues()
     .map(function (row) {
       const resolved = getRowDate(row, colIdxMap);
@@ -651,10 +694,8 @@ function getSummary(ss, period, groupBy, viewBy) {
                   prevOutflowTotal: 0, prevIncomeTotal: 0, daysInPeriod: daysInPeriod(period, groupBy) });
 
   const tz   = Session.getScriptTimeZone();
-  const rows = sheetData(sheet, 1, HDR_OUTFLOWS.length);
-
-  const colIdxMap = {};
-  RECORD_COLUMNS.forEach((key, i) => colIdxMap[key] = i);
+  const rows = sheetData(sheet, 1, recordWidth(sheet));
+  const colIdxMap = recordColIdx(sheet);
 
   let colIdx = colIdxMap['category'];
   if (viewBy === 'subcategory') colIdx = colIdxMap['subcategory'];
@@ -729,9 +770,8 @@ function getTrend(ss, endPeriod, count, groupBy) {
   periods.forEach(pd => { totals[pd] = { outflow: 0, income: 0 }; });
 
   const tz   = Session.getScriptTimeZone();
-  const rows = sheetData(sheet, 1, HDR_OUTFLOWS.length);
-  const colIdxMap = {};
-  RECORD_COLUMNS.forEach((key, i) => colIdxMap[key] = i);
+  const rows = sheetData(sheet, 1, recordWidth(sheet));
+  const colIdxMap = recordColIdx(sheet);
 
   for (const row of rows) {
     const d = getRowDate(row, colIdxMap);
