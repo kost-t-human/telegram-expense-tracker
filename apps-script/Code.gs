@@ -1,5 +1,5 @@
 /*
-  Google Apps Script v2 — Outflow & Inflow Tracker
+  Google Apps Script backend — Outflow & Inflow Tracker
   ═══════════════════════════════════════════════════════════════
   DEPLOY STEPS:
     1. Open https://script.google.com/home → New project
@@ -7,7 +7,11 @@
     3. Deploy → New deployment → Web App
        • Execute as: Me (owner)
        • Who has access: Anyone
-    4. Copy the /exec URL → paste it into index.html as GAS_URL
+    4. Copy the /exec URL → set it as GAS_URL in config.js
+
+  UPDATING: saving the editor is not enough — the /exec URL keeps serving the
+  last deployed version. Deploy → Manage deployments → edit → New version,
+  then confirm with ?action=diag that SCRIPT_VERSION is the one you expect.
   ═══════════════════════════════════════════════════════════════
 
   Sheets created automatically in the user's spreadsheet:
@@ -47,6 +51,10 @@ const RECORD_COLUMNS = [
   'name',        // User name (from settings or TG)
   'type'         // "outflow" or "inflow"
 ];
+// Bump when deploying a new version — `?action=diag` reports it back, which is
+// the only way to tell a live deployment apart from an outdated one.
+const SCRIPT_VERSION = '2.1.0';
+
 // ── Sheet names ────────────────────────────────────────────────
 const SH_OUTFLOWS   = 'Records';
 const SH_CATEGORIES = 'Categories';
@@ -120,6 +128,7 @@ function doGet(e) {
       case 'checkDuplicate': return checkDuplicate(ss, p);
       case 'getSummary':     return getSummary(ss, p.period, p.groupBy || 'month', p.viewBy || 'category');
       case 'getTrend':       return getTrend(ss, p.endPeriod, Number(p.count) || 6, p.groupBy || 'month');
+      case 'diag':           return diag(ss);
       default:               return err('unknown action: ' + p.action);
     }
   } catch (e) {
@@ -542,18 +551,75 @@ function checkDuplicate(ss, p) {
 function getRowDate(row, colIdxMap) {
   for (const key of ['date', 'timestamp']) {
     if (colIdxMap[key] === undefined) continue;
-    const v = row[colIdxMap[key]];
-    if (v instanceof Date && !isNaN(v)) return v;
-    if (v) {
-      const d = new Date(v);
-      if (!isNaN(d)) return d;
-    }
+    const d = toDate(row[colIdxMap[key]]);
+    if (d) return d;
   }
   if (colIdxMap['month'] !== undefined) {
     const m = parseInt(String(row[colIdxMap['month']] || ''), 10);
     if (m >= 1 && m <= 12) return new Date(new Date().getFullYear(), m - 1, 1);
   }
   return null;
+}
+
+// A cell holds a real Date only when the column is date-formatted. Spreadsheets
+// filled by hand or imported from another tracker keep the day as text, so the
+// day-first formats those templates use are parsed explicitly — new Date()
+// reads "15.08.2026" and "15/08/2026" as invalid or as a US month-first date.
+function toDate(v) {
+  if (v instanceof Date) return isNaN(v) ? null : v;
+  if (!v) return null;
+
+  const text = String(v).trim();
+
+  const dayFirst = text.match(/^(\d{1,2})[.\/](\d{1,2})[.\/](\d{4})$/);
+  if (dayFirst) {
+    const [, d, m, y] = dayFirst.map(Number);
+    return m >= 1 && m <= 12 ? new Date(y, m - 1, d) : null;
+  }
+
+  // Built as a local date on purpose: new Date('2026-03-01') is UTC midnight,
+  // which lands in February for any spreadsheet west of Greenwich.
+  const iso = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (iso) {
+    const [, y, m, d] = iso.map(Number);
+    return m >= 1 && m <= 12 ? new Date(y, m - 1, d) : null;
+  }
+
+  const parsed = new Date(v);
+  return isNaN(parsed) ? null : parsed;
+}
+
+// ══════════════════════════════════════════════════════════════
+// Diagnostics
+// ══════════════════════════════════════════════════════════════
+
+// Reports which code this deployment is actually running and how the last
+// records resolve, so a stale deployment can be told apart from a spreadsheet
+// whose date column is not what the script expects.
+// Call: <web app URL>?action=diag&spreadsheetId=<id>
+function diag(ss) {
+  const out = { status: 'ok', version: SCRIPT_VERSION, columns: RECORD_COLUMNS };
+  const sheet = ss && ss.getSheetByName(SH_OUTFLOWS);
+  if (!sheet || sheet.getLastRow() < 2) return json(out);
+
+  const colIdxMap = {};
+  RECORD_COLUMNS.forEach(function (key, i) { colIdxMap[key] = i; });
+
+  const tz = Session.getScriptTimeZone();
+  const lastRow = sheet.getLastRow();
+  const startRow = Math.max(2, lastRow - 2); // last 3 records is enough to tell
+  out.headers = sheet.getRange(1, 1, 1, HDR_OUTFLOWS.length).getValues()[0];
+  out.rows = sheet.getRange(startRow, 1, lastRow - startRow + 1, HDR_OUTFLOWS.length)
+    .getValues()
+    .map(function (row) {
+      const resolved = getRowDate(row, colIdxMap);
+      return {
+        row: row.map(String),
+        dateCellIsDate: row[colIdxMap['date']] instanceof Date,
+        usedForStats: resolved ? Utilities.formatDate(resolved, tz, 'yyyy-MM-dd') : null
+      };
+    });
+  return json(out);
 }
 
 // ══════════════════════════════════════════════════════════════
