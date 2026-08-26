@@ -36,6 +36,9 @@ background, which keeps entering several purchases in a row fast.
   app: add, rename, reorder by drag, hide. Changes propagate to the spreadsheet.
 - Monthly and yearly summaries: totals, balance, savings rate, share per
   category, comparison with the previous period and a six-period trend chart.
+- History of the latest records, outflows or inflows, grouped by day and paged
+  thirty at a time. A record can be edited in the record form or deleted from
+  the spreadsheet, deletion asking for confirmation first.
 - Duplicate guard for same-day records, so a double tap does not log twice.
 - Follows the Telegram theme (light and dark) and the client's back button.
 
@@ -110,6 +113,12 @@ deployment and leave it alone when pasting an updated script, or translate
 `date` holds the purchase date and drives every summary; `timestamp` only
 records when the row was entered.
 
+Editing and deleting from the History tab address a row by its number, which
+shifts whenever rows are added or removed elsewhere. Each such call therefore
+carries the signature the row had when it was read — its timestamp, amount,
+category and type — and the script refuses the write when the row no longer
+matches, so the app reloads the list instead of touching the wrong record.
+
 `Categories`, `Accounts`, `Transaction Types`, `Subcategories` and `Users` are
 created and maintained by the script.
 
@@ -142,6 +151,7 @@ key itself, so a partial translation degrades instead of breaking.
 ```sh
 node test/date-resolution.test.js   # summaries group by purchase date
 node test/column-mapping.test.js    # fields resolve to the right columns
+node test/record-editing.test.js    # an edit never lands on the wrong row
 node test/wiring.test.js            # markup and app.js still agree
 ```
 

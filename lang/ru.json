@@ -104,5 +104,18 @@
   "txntypes_restored": "Скрытые виды восстановлены",
   "no_txntype": "— не выбрано —",
   "item_exists": "«{name}» уже есть в списке",
-  "cat_exists": "Категория «{name}» уже есть"
+  "cat_exists": "Категория «{name}» уже есть",
+  "nav_history": "История",
+  "load_more": "Показать ещё",
+  "no_records_yet": "Пока нет записей",
+  "today": "Сегодня",
+  "yesterday": "Вчера",
+  "edit_record": "Редактировать",
+  "delete_record": "Удалить",
+  "delete_confirm_text": "Удалить эту запись из таблицы? Отменить будет нельзя.",
+  "record_updated": "Запись обновлена ✓",
+  "record_deleted": "Запись удалена",
+  "record_stale": "Запись изменилась — список обновлён",
+  "editing_record": "Редактирование записи",
+  "save_changes": "Сохранить изменения"
 }

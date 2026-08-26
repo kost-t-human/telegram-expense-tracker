@@ -104,5 +104,18 @@
   "txntypes_restored": "Đã khôi phục loại ẩn",
   "no_txntype": "— chưa chọn —",
   "item_exists": "\"{name}\" đã có trong danh sách",
-  "cat_exists": "Danh mục \"{name}\" đã tồn tại"
+  "cat_exists": "Danh mục \"{name}\" đã tồn tại",
+  "nav_history": "Lịch sử",
+  "load_more": "Xem thêm",
+  "no_records_yet": "Chưa có giao dịch nào",
+  "today": "Hôm nay",
+  "yesterday": "Hôm qua",
+  "edit_record": "Sửa",
+  "delete_record": "Xóa",
+  "delete_confirm_text": "Xóa giao dịch này khỏi bảng tính? Không thể hoàn tác.",
+  "record_updated": "Đã cập nhật giao dịch ✓",
+  "record_deleted": "Đã xóa giao dịch",
+  "record_stale": "Giao dịch đã thay đổi — danh sách đã được tải lại",
+  "editing_record": "Đang sửa giao dịch",
+  "save_changes": "Lưu thay đổi"
 }

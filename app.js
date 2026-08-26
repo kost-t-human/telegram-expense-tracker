@@ -43,6 +43,11 @@ const S = {
   summaryView:   lsGet('summaryView') || 'category',
   summaryPeriod: '',
   settingsCatType: 'outflow',
+  historyType:   lsGet('historyType') || 'outflow',
+  historyRecords: [],   // the page(s) currently listed, newest entry first
+  historyHasMore: false,
+  recordPicked:  null,  // the record the actions modal is open for
+  editing:       null,  // {row, sig} while the form edits an existing record
   tgUser: null,
 
   catCache: load('catCache', {}),                   // {outflow:[], inflow:[]}
@@ -110,8 +115,10 @@ function applyLang() {
 
   updateLangButtons();
   setType(S.expenseType);
+  updateSubmitLabel();
   if ($('tab-settings').classList.contains('active')) renderCatList();
   if ($('tab-summary').classList.contains('active') && S.summaryPeriod) loadSummary();
+  if ($('tab-history').classList.contains('active')) renderHistory();
 }
 
 function updateLangButtons() {
@@ -229,6 +236,18 @@ function fillSelect(el, items, placeholder) {
   if (items.includes(prev)) el.value = prev;
 }
 
+/**
+ * Selects a value in a <select>, adding the option first when the list has no
+ * such entry. Assigning an unknown value silently keeps the previous choice,
+ * which would quietly rewrite the field of a record being edited.
+ */
+function selectValue(el, value) {
+  if (!el) return;
+  const v = value || '';
+  if (v && ![...el.options].some(o => o.value === v)) el.add(new Option(v, v));
+  el.value = v;
+}
+
 /** Renders a reorderable list of names with rename/hide actions. */
 function renderDraggableList(el, items, { onEdit, onHide, onReorder }) {
   el.innerHTML = '';
@@ -270,6 +289,7 @@ function showTab(tab, pushState = true) {
   $('nav-' + tab).classList.add('active');
 
   if (tab === 'summary') renderSummary();
+  if (tab === 'history') renderHistory();
   if (tab === 'settings') {
     renderCatList();
     renderListSettings('accounts');
@@ -651,6 +671,24 @@ async function submitForm() {
   const busy = on => { btn.disabled = on; btn.classList.toggle('loading', on); };
   busy(true);
   try {
+    if (S.editing) {
+      // Not optimistic, unlike a new record: an edit that silently failed would
+      // leave the list showing something the spreadsheet does not hold.
+      const res = await apiGet({
+        action: 'updateRecord', spreadsheetId: S.spreadsheetId,
+        row: S.editing.row, sig: S.editing.sig,
+        date, category, subcategory, amount: signedAmount(amount),
+        account, txnType, note, type: S.expenseType,
+      });
+      busy(false);
+      if (res.status === 'stale') { staleRecord(); return; }
+      if (res.status !== 'ok') throw new Error(res.message || 'Server error');
+      cancelEdit();
+      showToast(t('record_updated'));
+      showTab('history');
+      return;
+    }
+
     // Same-day duplicates are the ones worth questioning; older dates are
     // usually deliberate backfilling.
     if (date === todayStr()) {
@@ -703,12 +741,14 @@ function confirmDuplicate() {
   });
 }
 
+/** Some spreadsheet templates expect outflows as negative numbers. */
+const signedAmount = amount =>
+  S.minusSign && S.expenseType === 'outflow' ? -Math.abs(amount) : amount;
+
 async function saveRecord({ date, category, subcategory, amount, account, txnType, note }) {
-  // Some spreadsheet templates expect outflows as negative numbers.
-  const signed = S.minusSign && S.expenseType === 'outflow' ? -Math.abs(amount) : amount;
   const res = await apiGet({
     action: 'addRecord', spreadsheetId: S.spreadsheetId,
-    date, category, subcategory, amount: signed, account, txnType, note,
+    date, category, subcategory, amount: signedAmount(amount), account, txnType, note,
     type: S.expenseType,
     firstName: S.tgUser?.first_name || '',
     lastName:  S.tgUser?.last_name || '',
@@ -941,6 +981,211 @@ function renderSummaryData(data) {
   $('summaryContent').innerHTML = kpi + vs + insight
     + section(outflows, totOut, 'var(--out)', 'expenses_title', 'bi-arrow-up-circle-fill')
     + section(inflows, totIn, 'var(--in)', 'inflow_title', 'bi-arrow-down-circle-fill');
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  History
+// ══════════════════════════════════════════════════════════════════
+
+const HISTORY_PAGE = 30;
+
+function setHistoryType(type) {
+  S.historyType = type;
+  lsSet('historyType', type);
+  updateHistoryButtons();
+  loadHistory();
+}
+
+function updateHistoryButtons() {
+  const isOut = S.historyType === 'outflow';
+  $('btnHistOut').className = 'seg-btn' + (isOut ? ' active-out' : '');
+  $('btnHistIn').className  = 'seg-btn' + (isOut ? '' : ' active-in');
+}
+
+function renderHistory() {
+  updateHistoryButtons();
+  loadHistory();
+}
+
+const loadMoreHistory = () => loadHistory(true);
+
+async function loadHistory(append = false) {
+  const box  = $('historyContent');
+  const more = $('historyMoreBtn');
+
+  if (!S.spreadsheetId) {
+    more.style.display = 'none';
+    box.innerHTML = `<div class="text-center text-muted py-5">${esc(t('setup_table'))}</div>`;
+    return;
+  }
+  if (!append) {
+    S.historyRecords = [];
+    more.style.display = 'none';
+    box.innerHTML = '<div class="text-center py-5"><div class="spinner-border spinner-border-sm" style="color:var(--hint)"></div></div>';
+  }
+  more.classList.toggle('loading', append);
+  more.disabled = append;
+
+  try {
+    const res = await apiGet({
+      action: 'getRecords', spreadsheetId: S.spreadsheetId,
+      type: S.historyType, limit: HISTORY_PAGE, offset: S.historyRecords.length,
+    });
+    if (res.status !== 'ok') throw new Error(res.message);
+    S.historyRecords = S.historyRecords.concat(res.records || []);
+    S.historyHasMore = !!res.hasMore;
+    renderHistoryList();
+  } catch (e) {
+    if (append) showToast(t('error_prefix') + e.message, 'error');
+    else box.innerHTML = `<div class="text-center text-danger py-4"><i class="bi bi-exclamation-circle"></i> ${esc(e.message)}</div>`;
+  } finally {
+    more.classList.remove('loading');
+    more.disabled = false;
+  }
+}
+
+/** 'Today' / 'Yesterday' / '24 August' for a YYYY-MM-DD purchase date. */
+function dateHeading(iso) {
+  if (!iso) return '—';
+  if (iso === todayStr()) return t('today');
+  if (iso === new Date(Date.now() - 864e5).toISOString().slice(0, 10)) return t('yesterday');
+
+  const [y, m, d] = iso.split('-').map(Number);
+  const opts = { day: 'numeric', month: 'long' };
+  if (y !== new Date().getFullYear()) opts.year = 'numeric';
+  // toLocaleDateString gets the case right where a month name list would not:
+  // Russian needs "24 августа", not the nominative "24 Август".
+  return new Date(y, m - 1, d).toLocaleDateString(S.lang || 'en', opts);
+}
+
+function renderHistoryList() {
+  const box  = $('historyContent');
+  const recs = S.historyRecords;
+  $('historyMoreBtn').style.display = S.historyHasMore ? 'flex' : 'none';
+
+  if (!recs.length) {
+    box.innerHTML = `<div class="text-center text-muted py-5">${esc(t('no_records_yet'))}</div>`;
+    return;
+  }
+
+  const color = S.historyType === 'outflow' ? 'var(--out)' : 'var(--in)';
+  let html = '', day = null;
+  recs.forEach((r, i) => {
+    if (r.date !== day) {
+      if (day !== null) html += '</div>';
+      html += `<div class="sec-hdr${day === null ? '' : ' pt-3'}">${esc(dateHeading(r.date))}</div><div class="rec-group">`;
+      day = r.date;
+    }
+    const meta = [r.subcategory, r.account, r.txnType, r.note].filter(Boolean).join(' · ');
+    html += `<div class="rec-row" onclick="openRecord(${i})">
+        <div class="rec-info">
+          <div class="rec-name">${esc(r.category || '—')}</div>
+          ${meta ? `<div class="rec-meta">${esc(meta)}</div>` : ''}
+        </div>
+        <div class="rec-right">
+          <span class="rec-amt" style="color:${color}">${formatMoney(r.amount)}</span>
+          ${r.time ? `<span class="rec-time">${esc(r.time)}</span>` : ''}
+        </div>
+      </div>`;
+  });
+  box.innerHTML = html + '</div>';
+}
+
+function openRecord(i) {
+  const r = S.historyRecords[i];
+  if (!r) return;
+  S.recordPicked = r;
+
+  const color = r.type === 'inflow' ? 'var(--in)' : 'var(--out)';
+  const parts = [r.category, r.subcategory, r.account, r.txnType, r.note].filter(Boolean);
+  $('recSummary').innerHTML =
+    `<div class="rec-modal-amt" style="color:${color}">${formatMoney(r.amount)}</div>`
+    + `<div class="rec-modal-when">${esc(dateHeading(r.date))}${r.time ? ' · ' + esc(r.time) : ''}</div>`
+    + (parts.length ? `<div class="rec-modal-parts">${esc(parts.join(' · '))}</div>` : '');
+
+  showRecordActions();
+  bootstrap.Modal.getOrCreateInstance($('recModal')).show();
+}
+
+function showRecordActions() {
+  $('recActions').style.display = 'flex';
+  $('recConfirm').style.display = 'none';
+}
+function askDeleteRecord() {
+  $('recActions').style.display = 'none';
+  $('recConfirm').style.display = 'block';
+}
+function closeRecordModal() {
+  bootstrap.Modal.getOrCreateInstance($('recModal')).hide();
+  S.recordPicked = null;
+}
+
+/** The row moved or is gone: drop what we hold and re-read the list. */
+function staleRecord() {
+  showToast(t('record_stale'), 'warning');
+  closeRecordModal();
+  if (S.editing) cancelEdit();
+  showTab('history');
+}
+
+async function confirmDeleteRecord() {
+  const r = S.recordPicked;
+  if (!r) return;
+  const btn = $('recDeleteBtn');
+  btn.disabled = true;
+  btn.classList.add('loading');
+  try {
+    const res = await apiGet({
+      action: 'deleteRecord', spreadsheetId: S.spreadsheetId, row: r.row, sig: r.sig,
+    });
+    if (res.status === 'stale') { staleRecord(); return; }
+    if (res.status !== 'ok') throw new Error(res.message || 'Server error');
+    closeRecordModal();
+    showToast(t('record_deleted'));
+    loadHistory();
+  } catch (e) {
+    showToast(t('error_prefix') + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.classList.remove('loading');
+  }
+}
+
+/** Loads the picked record into the record form, which then updates instead of appending. */
+function startEditRecord() {
+  const r = S.recordPicked;
+  if (!r) return;
+  S.editing = { row: r.row, sig: r.sig };
+  closeRecordModal();
+
+  setType(r.type === 'inflow' ? 'inflow' : 'outflow');
+  $('fDate').value = r.date || todayStr();
+  selectValue($('fCategory'), r.category);
+  renderSubcatSelect();
+  selectValue($('fSubcategory'), r.subcategory);
+  selectValue($('fAccount'), r.account);
+  selectValue($('fTxnType'), r.txnType);
+  $('fNote').value = r.note || '';
+  // Through the input handler, so the amount is grouped like a typed one.
+  $('fAmount').value = String(Math.abs(r.amount));
+  $('fAmount').dispatchEvent(new Event('input'));
+
+  $('editBanner').style.display = 'flex';
+  updateSubmitLabel();
+  showTab('main');
+  window.scrollTo(0, 0);
+}
+
+function cancelEdit() {
+  S.editing = null;
+  $('editBanner').style.display = 'none';
+  updateSubmitLabel();
+  for (const id of ['fAmount', 'fSubcategory', 'fAccount', 'fTxnType', 'fNote']) $(id).value = '';
+  $('fDate').value = todayStr();
+}
+
+function updateSubmitLabel() {
+  $('submitBtn').querySelector('.btn-label').textContent = t(S.editing ? 'save_changes' : 'save');
 }
 
 // ══════════════════════════════════════════════════════════════════

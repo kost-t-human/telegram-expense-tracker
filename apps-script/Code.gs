@@ -60,7 +60,7 @@ const RECORD_COLUMNS = [
 ];
 // Bump when deploying a new version — `?action=diag` reports it back, which is
 // the only way to tell a live deployment apart from an outdated one.
-const SCRIPT_VERSION = '2.2.1';
+const SCRIPT_VERSION = '2.3.0';
 
 // ── Sheet names ────────────────────────────────────────────────
 const SH_OUTFLOWS   = 'Records';
@@ -171,6 +171,9 @@ function doGet(e) {
       case 'addListItem':    return addListItemAction(ss, p);
       case 'renameListItem': return renameListItemAction(ss, p);
       case 'addRecord':      return addRecord(ss, p);
+      case 'getRecords':     return getRecords(ss, p);
+      case 'updateRecord':   return updateRecord(ss, p);
+      case 'deleteRecord':   return deleteRecord(ss, p);
       case 'checkDuplicate': return checkDuplicate(ss, p);
       case 'getSummary':     return getSummary(ss, p.period, p.groupBy || 'month', p.viewBy || 'category');
       case 'getTrend':       return getTrend(ss, p.endPeriod, Number(p.count) || 6, p.groupBy || 'month');
@@ -477,25 +480,22 @@ function upsertUser(ss, firstName, lastName, username, appUserName) {
 // Records
 // ══════════════════════════════════════════════════════════════
 
-function addRecord(ss, p) {
-  const sheet       = getOrCreateSheet(ss, SH_OUTFLOWS, HDR_OUTFLOWS);
-  const firstName   = String(p.firstName    || '');
-  const lastName    = String(p.lastName     || '');
-  const username    = String(p.username     || '');
+// The fields the app's form owns, as cell values, with the lists the record
+// mentions upserted along the way. Shared by addRecord and updateRecord so an
+// edited row is written exactly like a new one — 'timestamp' and 'name' are
+// deliberately absent: they belong to whoever entered the row, not to the form.
+function recordFieldValues(ss, p) {
+  const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
   const typeRaw     = String(p.type         || 'outflow').toLowerCase();
-  const type        = typeRaw.charAt(0).toUpperCase() + typeRaw.slice(1); // "Outflow" / "Inflow"
+  const category    = String(p.category     || '').trim();
   const subcategory = String(p.subcategory  || '').trim();
   const account     = String(p.account      || '').trim();
-  const txnType  = String(p.txnType        || '').trim();
+  const txnType     = String(p.txnType      || '').trim();
 
-  const userName = upsertUser(ss, firstName, lastName, username, p.userName);
-
-  const category = String(p.category || '').trim();
   if (account)     upsertListItem(ss, SH_ACCOUNTS, HDR_ACCOUNTS, account);
-  if (txnType)       upsertListItem(ss, SH_TXNTYPES,   HDR_TXNTYPES,   txnType);
+  if (txnType)     upsertListItem(ss, SH_TXNTYPES, HDR_TXNTYPES, txnType);
   if (subcategory) { migrateSubcatsSheet(ss); upsertListItem(ss, SH_SUBCATS, HDR_SUBCATS, subcategory, category); }
-
-  const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
   let purchaseDate = '';
   let purchaseMonth = '';
@@ -507,30 +507,41 @@ function addRecord(ss, p) {
     }
   }
 
-  const amount = p.amount !== undefined ? Number(p.amount) : '';
-
-  const values = {
-    timestamp:   new Date(),
+  return {
     month:       purchaseMonth,
     date:        purchaseDate,
-    amount:      amount,
+    amount:      p.amount !== undefined ? Number(p.amount) : '',
     txnType:     txnType,
-    category:    p.category || '',
+    category:    category,
     subcategory: subcategory,
     description: p.note || '',
     account:     account,
-    name:        userName,
-    type:        type
+    type:        typeRaw.charAt(0).toUpperCase() + typeRaw.slice(1) // "Outflow" / "Inflow"
   };
+}
 
-  // Placed by the sheet's own column order, not by RECORD_COLUMNS.
-  const colIdxMap = recordColIdx(sheet);
-  const numCols = recordWidth(sheet);
-  const rowData = new Array(numCols).fill('');
-  RECORD_COLUMNS.forEach(function (key) {
+// Places values into a row by the sheet's own column order, not by
+// RECORD_COLUMNS, leaving columns this script knows nothing about untouched.
+function applyRecordValues(rowData, values, colIdxMap, numCols) {
+  Object.keys(values).forEach(function (key) {
     const i = colIdxMap[key];
     if (i !== undefined && i < numCols) rowData[i] = values[key];
   });
+  return rowData;
+}
+
+function addRecord(ss, p) {
+  const sheet    = getOrCreateSheet(ss, SH_OUTFLOWS, HDR_OUTFLOWS);
+  const userName = upsertUser(ss, String(p.firstName || ''), String(p.lastName || ''),
+                              String(p.username || ''), p.userName);
+
+  const values = recordFieldValues(ss, p);
+  values.timestamp = new Date();
+  values.name      = userName;
+
+  const colIdxMap = recordColIdx(sheet);
+  const numCols = recordWidth(sheet);
+  const rowData = applyRecordValues(new Array(numCols).fill(''), values, colIdxMap, numCols);
 
   sheet.appendRow(rowData);
 
@@ -544,6 +555,129 @@ function addRecord(ss, p) {
   }
 
   return json({ status: 'ok' });
+}
+
+// ══════════════════════════════════════════════════════════════
+// Reading, editing and deleting individual records
+// ══════════════════════════════════════════════════════════════
+
+// A row is addressed by its number, and a row number is not a stable identity:
+// rows shift when the spreadsheet is edited by hand or by a second client. So
+// every edit carries the signature the row had when it was read, and the server
+// refuses the write when the row no longer matches it — better a "reload and
+// try again" than deleting the neighbour of the record the user picked.
+//
+// Built from the cells an edit cannot silently reproduce: when it does change,
+// it is a different record.
+function rowSignature(row, colIdxMap) {
+  const cell = function (key) {
+    const i = colIdxMap[key];
+    return i === undefined ? '' : row[i];
+  };
+  const ts = toDate(cell('timestamp'));
+  return [
+    ts ? ts.getTime() : '',
+    Number(cell('amount')) || 0,
+    String(cell('category') || '').trim(),
+    String(cell('type') || '').trim().toLowerCase()
+  ].join('|');
+}
+
+// Runs fn against the row p.row under the script lock, but only if it still
+// carries the signature p.sig. Returns {status:'stale'} when it does not.
+function withVerifiedRow(ss, p, fn) {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(15000)) return err('spreadsheet busy, try again');
+  try {
+    const sheet = ss.getSheetByName(SH_OUTFLOWS);
+    if (!sheet) return json({ status: 'stale' });
+
+    const row = Number(p.row);
+    if (!(row >= 2 && row <= sheet.getLastRow())) return json({ status: 'stale' });
+
+    const numCols   = recordWidth(sheet);
+    const values    = sheet.getRange(row, 1, 1, numCols).getValues()[0];
+    const colIdxMap = recordColIdx(sheet);
+    if (rowSignature(values, colIdxMap) !== String(p.sig || '')) return json({ status: 'stale' });
+
+    return fn(sheet, row, values, colIdxMap, numCols);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// Records of one type, newest entry first — that is bottom-up, since rows are
+// appended in entry order (the purchase date can be backdated, the row is not).
+function getRecords(ss, p) {
+  const limit  = Math.min(Math.max(Number(p.limit) || 30, 1), 200);
+  const offset = Math.max(Number(p.offset) || 0, 0);
+  const wanted = String(p.type || 'outflow').toLowerCase();
+
+  const sheet = ss.getSheetByName(SH_OUTFLOWS);
+  if (!sheet || sheet.getLastRow() < 2)
+    return json({ status: 'ok', records: [], hasMore: false });
+
+  const tz        = Session.getScriptTimeZone();
+  const numCols   = recordWidth(sheet);
+  const rows      = sheetData(sheet, 1, numCols);
+  const colIdxMap = recordColIdx(sheet);
+
+  const str = function (row, key) {
+    const i = colIdxMap[key];
+    return i === undefined ? '' : String(row[i] || '').trim();
+  };
+
+  const records = [];
+  let matched = 0;
+  for (let i = rows.length - 1; i >= 0; i--) {
+    const row = rows[i];
+    const amount = Number(row[colIdxMap['amount']]) || 0;
+    if (!amount && !str(row, 'category')) continue; // blank row left in the sheet
+
+    const type = (str(row, 'type') || 'outflow').toLowerCase();
+    if (type !== wanted) continue;
+
+    matched++;
+    if (matched <= offset) continue;
+    if (records.length >= limit) return json({ status: 'ok', records: records, hasMore: true });
+
+    const day = getRowDate(row, colIdxMap);
+    const ts  = colIdxMap['timestamp'] === undefined ? null : toDate(row[colIdxMap['timestamp']]);
+    records.push({
+      row:         i + 2, // +1 for the header, +1 because sheet rows are 1-based
+      sig:         rowSignature(row, colIdxMap),
+      date:        day ? Utilities.formatDate(day, tz, 'yyyy-MM-dd') : '',
+      time:        ts  ? Utilities.formatDate(ts,  tz, 'HH:mm')      : '',
+      amount:      amount,
+      category:    str(row, 'category'),
+      subcategory: str(row, 'subcategory'),
+      account:     str(row, 'account'),
+      txnType:     str(row, 'txnType'),
+      note:        str(row, 'description'),
+      type:        type
+    });
+  }
+  return json({ status: 'ok', records: records, hasMore: false });
+}
+
+function updateRecord(ss, p) {
+  return withVerifiedRow(ss, p, function (sheet, row, current, colIdxMap, numCols) {
+    // Resolved after the row is verified, so a stale edit does not leave the
+    // account and subcategory it mentions behind in the lists.
+    const values = recordFieldValues(ss, p);
+    // 'timestamp' and 'name' stay as they are: the row keeps who entered it and
+    // when, an edit only rewrites what the form holds.
+    sheet.getRange(row, 1, 1, numCols)
+         .setValues([applyRecordValues(current, values, colIdxMap, numCols)]);
+    return json({ status: 'ok' });
+  });
+}
+
+function deleteRecord(ss, p) {
+  return withVerifiedRow(ss, p, function (sheet, row) {
+    sheet.deleteRow(row);
+    return json({ status: 'ok' });
+  });
 }
 
 function checkDuplicate(ss, p) {

@@ -152,6 +152,33 @@
     .trend-legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--hint); }
     .trend-legend-dot { width: 8px; height: 8px; border-radius: 2px; }
 
+    /* History */
+    .rec-group { background: var(--surface); border-radius: var(--r-lg); box-shadow: var(--sh); overflow: hidden; }
+    .rec-row { display: flex; align-items: center; gap: 10px; padding: 11px 16px; position: relative; cursor: pointer; transition: background .12s; }
+    .rec-row:active { background: rgba(120,120,128,.1); }
+    .rec-row + .rec-row::before { content: ''; position: absolute; top: 0; left: 16px; right: 0; height: 1px; background: var(--border); }
+    .rec-info { flex: 1; min-width: 0; }
+    .rec-name { font-size: 15px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .rec-meta { font-size: 12px; color: var(--hint); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .rec-right { text-align: right; white-space: nowrap; }
+    .rec-amt { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; display: block; }
+    .rec-time { font-size: 11px; color: var(--hint); }
+    .s-btn .btn-spinner { width: 16px; height: 16px; border: 2.5px solid var(--border); border-top-color: var(--acc); border-radius: 50%; animation: btn-spin .65s linear infinite; flex-shrink: 0; display: none; }
+    .s-btn.loading .btn-spinner { display: block; }
+
+    /* Record actions modal */
+    .rec-modal-sum { text-align: center; margin-bottom: 20px; }
+    .rec-modal-amt { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .rec-modal-when { font-size: 13px; color: var(--hint); margin-top: 2px; }
+    .rec-modal-parts { font-size: 14px; margin-top: 8px; word-break: break-word; }
+    .rec-confirm-text { font-size: 14px; color: var(--hint); text-align: center; margin: 0 0 18px; }
+    .s-btn.rec-danger { color: var(--out); }
+    .rec-plain { background: var(--bg); color: var(--text); box-shadow: none; }
+
+    /* Editing an existing record */
+    #editBanner { display: flex; align-items: center; gap: 8px; background: rgba(0,122,255,.1); color: var(--acc); border-radius: var(--r); padding: 10px 12px; font-size: 13px; font-weight: 600; margin-bottom: 12px; }
+    .edit-cancel { margin-left: auto; background: none; border: none; color: var(--acc); cursor: pointer; padding: 2px 4px; font-size: 14px; }
+
     /* Settings */
     .s-section { background: var(--surface); border-radius: var(--r-lg); box-shadow: var(--sh); overflow: hidden; margin-bottom: 16px; }
     .s-row { display: flex; align-items: center; padding: 12px 16px; gap: 10px; position: relative; }

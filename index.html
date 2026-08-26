@@ -104,6 +104,12 @@
   <!-- TAB: MAIN -->
   <div id="tab-main" class="tab-panel active">
 
+    <div id="editBanner" style="display:none">
+      <i class="bi bi-pencil-fill"></i>
+      <span data-i18n="editing_record">Редактирование записи</span>
+      <button class="edit-cancel" onclick="cancelEdit()"><i class="bi bi-x-lg"></i></button>
+    </div>
+
     <div class="seg">
       <button id="btnOut" class="seg-btn" onclick="setType('outflow')">
         <i class="bi bi-arrow-up-circle-fill"></i>
@@ -206,6 +212,28 @@
     <div id="summaryContent">
       <div class="text-center py-5"><div class="spinner-border spinner-border-sm text-secondary"></div></div>
     </div>
+  </div>
+
+  <!-- TAB: HISTORY -->
+  <div id="tab-history" class="tab-panel">
+
+    <div class="seg">
+      <button id="btnHistOut" class="seg-btn" onclick="setHistoryType('outflow')">
+        <i class="bi bi-arrow-up-circle-fill"></i>
+        <span data-i18n="expense">Расход</span>
+      </button>
+      <button id="btnHistIn" class="seg-btn" onclick="setHistoryType('inflow')">
+        <i class="bi bi-arrow-down-circle-fill"></i>
+        <span data-i18n="inflow">Доход</span>
+      </button>
+    </div>
+
+    <div id="historyContent"></div>
+
+    <button id="historyMoreBtn" class="s-btn" style="display:none" onclick="loadMoreHistory()">
+      <span class="btn-spinner"></span>
+      <span class="btn-label" data-i18n="load_more">Показать ещё</span>
+    </button>
   </div>
 
   <!-- TAB: SETTINGS -->
@@ -385,6 +413,9 @@
   <button class="nav-btn" id="nav-summary" onclick="showTab('summary')">
     <i class="bi bi-bar-chart-line"></i><span data-i18n="nav_summary">Сводка</span>
   </button>
+  <button class="nav-btn" id="nav-history" onclick="showTab('history')">
+    <i class="bi bi-clock-history"></i><span data-i18n="nav_history">История</span>
+  </button>
   <button class="nav-btn" id="nav-settings" onclick="showTab('settings')">
     <i class="bi bi-gear"></i><span data-i18n="nav_settings">Настройки</span>
   </button>
@@ -401,6 +432,41 @@
           <button class="submit-btn flex-fill bg-light text-dark shadow-none" data-bs-dismiss="modal" data-i18n="cancel">Отмена</button>
           <button id="dupConfirmBtn" class="submit-btn flex-fill out shadow-none" data-i18n="yes_add">Да, внести</button>
         </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="recModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered mx-3">
+    <div class="modal-content">
+      <div class="modal-body p-4">
+
+        <div id="recSummary" class="rec-modal-sum"></div>
+
+        <div id="recActions" class="d-flex flex-column gap-2">
+          <button class="s-btn" onclick="startEditRecord()">
+            <i class="bi bi-pencil"></i><span data-i18n="edit_record">Редактировать</span>
+          </button>
+          <button class="s-btn rec-danger" onclick="askDeleteRecord()">
+            <i class="bi bi-trash3"></i><span data-i18n="delete_record">Удалить</span>
+          </button>
+          <button class="s-btn rec-plain" data-bs-dismiss="modal" data-i18n="cancel">Отмена</button>
+        </div>
+
+        <div id="recConfirm" style="display:none">
+          <p class="rec-confirm-text" data-i18n="delete_confirm_text">
+            Удалить эту запись из таблицы? Отменить будет нельзя.
+          </p>
+          <div class="d-flex gap-2">
+            <button class="submit-btn flex-fill rec-plain shadow-none" onclick="showRecordActions()" data-i18n="cancel">Отмена</button>
+            <button id="recDeleteBtn" class="submit-btn flex-fill out shadow-none" onclick="confirmDeleteRecord()">
+              <span class="btn-spinner"></span>
+              <span class="btn-label" data-i18n="delete_record">Удалить</span>
+            </button>
+          </div>
+        </div>
+
       </div>
     </div>
   </div>

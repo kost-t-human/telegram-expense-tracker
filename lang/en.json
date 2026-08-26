@@ -104,5 +104,18 @@
   "txntypes_restored": "Hidden types restored",
   "no_txntype": "— none —",
   "item_exists": "\"{name}\" is already in the list",
-  "cat_exists": "Category \"{name}\" already exists"
+  "cat_exists": "Category \"{name}\" already exists",
+  "nav_history": "History",
+  "load_more": "Show more",
+  "no_records_yet": "No records yet",
+  "today": "Today",
+  "yesterday": "Yesterday",
+  "edit_record": "Edit",
+  "delete_record": "Delete",
+  "delete_confirm_text": "Delete this record from the spreadsheet? This cannot be undone.",
+  "record_updated": "Record updated ✓",
+  "record_deleted": "Record deleted",
+  "record_stale": "The record has changed — the list was reloaded",
+  "editing_record": "Editing record",
+  "save_changes": "Save changes"
 }
