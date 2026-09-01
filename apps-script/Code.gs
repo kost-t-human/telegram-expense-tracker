@@ -60,7 +60,7 @@ const RECORD_COLUMNS = [
 ];
 // Bump when deploying a new version — `?action=diag` reports it back, which is
 // the only way to tell a live deployment apart from an outdated one.
-const SCRIPT_VERSION = '2.3.0';
+const SCRIPT_VERSION = '2.4.0';
 
 // ── Sheet names ────────────────────────────────────────────────
 const SH_OUTFLOWS   = 'Records';
@@ -647,6 +647,10 @@ function getRecords(ss, p) {
       row:         i + 2, // +1 for the header, +1 because sheet rows are 1-based
       sig:         rowSignature(row, colIdxMap),
       date:        day ? Utilities.formatDate(day, tz, 'yyyy-MM-dd') : '',
+      // The entry stamp is split in two: `date` above is the day the money
+      // moved, these are when the row was written, which can be a different
+      // day entirely when a purchase is entered later.
+      entryDate:   ts  ? Utilities.formatDate(ts,  tz, 'yyyy-MM-dd') : '',
       time:        ts  ? Utilities.formatDate(ts,  tz, 'HH:mm')      : '',
       amount:      amount,
       category:    str(row, 'category'),

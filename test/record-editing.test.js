@@ -94,6 +94,16 @@ check('the type filter selects inflows too',
 check('dates and entry times are formatted for the app',
   [page.records[0].date, page.records[0].time], ['2026-08-25', '18:30']);
 
+// A purchase entered days after it happened files under the day it happened,
+// while the stamp the History tab prints under the amount belongs to the row.
+const lateSheet = makeSheet([
+  RECORD_COLUMNS.map(k => COLUMN_DISPLAY_NAMES[k] || k),
+  record({ ts: new Date(2026, 8, 1, 14, 32), day: new Date(2026, 7, 20), amount: 50, category: 'Rent' }),
+]);
+const late = getRecords(asSpreadsheet(lateSheet), { type: 'outflow' }).records[0];
+check('the entry stamp carries its own date, not the purchase day',
+  [late.date, late.entryDate, late.time], ['2026-08-20', '2026-09-01', '14:32']);
+
 // ── The guard: a row number alone must not be trusted ───────────────────
 const taxi = page.records[0]; // row 4
 check('the signature identifies the row it was read from',
@@ -136,4 +146,4 @@ check('an edit sent twice is refused the second time, the row no longer matching
   }).status, 'stale');
 
 if (failed) process.exit(1);
-console.log('record editing: 19 checks OK');
+console.log('record editing: 20 checks OK');

@@ -1149,6 +1149,19 @@ function dateHeading(iso) {
   return new Date(y, m - 1, d).toLocaleDateString(S.lang || 'en', opts);
 }
 
+/**
+ * The stamp under the amount: when the row was entered, which is not always the
+ * day it is filed under. Apps Script deployments older than 2.4.0 send no
+ * entryDate, and those fall back to the bare time they always showed.
+ */
+function entryStamp(r) {
+  if (!r.time || !r.entryDate) return r.time || '';
+  const [y, m, d] = r.entryDate.split('-').map(Number);
+  const opts = { day: '2-digit', month: '2-digit' };
+  if (y !== new Date().getFullYear()) opts.year = '2-digit';
+  return new Date(y, m - 1, d).toLocaleDateString(S.lang || 'en', opts) + ' ' + r.time;
+}
+
 function renderHistoryList() {
   const box  = $('historyContent');
   const recs = S.historyRecords;
@@ -1175,7 +1188,7 @@ function renderHistoryList() {
         </div>
         <div class="rec-right">
           <span class="rec-amt" style="color:${color}">${formatMoney(r.amount)}</span>
-          ${r.time ? `<span class="rec-time">${esc(r.time)}</span>` : ''}
+          ${r.time ? `<span class="rec-time">${esc(entryStamp(r))}</span>` : ''}
         </div>
       </div>`;
   });
