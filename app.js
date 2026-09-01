@@ -4,7 +4,8 @@
  * Records are stored in a Google Spreadsheet through a Google Apps Script web
  * app (see apps-script/Code.gs). Everything else — categories, settings, UI
  * state — lives in localStorage, namespaced by APP_ID so that several bot
- * deployments can share one browser origin.
+ * deployments can share one browser origin, and is mirrored into Telegram's
+ * per-user CloudStorage so the settings follow the user to another device.
  *
  * GAS_URL and APP_ID come from config.js (see config.js.example).
  */
@@ -23,53 +24,143 @@ const $ = id => document.getElementById(id);
 // ══════════════════════════════════════════════════════════════════
 
 const lsGet = (k, d = '') => localStorage.getItem(APP_ID + ':' + k) ?? d;
-const lsSet = (k, v) => localStorage.setItem(APP_ID + ':' + k, v);
+const lsSet = (k, v) => { localStorage.setItem(APP_ID + ':' + k, v); cloudPut(k, v); };
 const save = (key, val) => lsSet(key, JSON.stringify(val));
 const load = (key, def) => {
   try { const v = JSON.parse(lsGet(key, 'null')); return v !== null ? v : def; }
   catch { return def; }
 };
 
+/** The APP_ID-namespaced keys currently in localStorage, prefix stripped. */
+const localKeys = () =>
+  Array.from({ length: localStorage.length }, (_, i) => localStorage.key(i))
+    .filter(k => k && k.startsWith(APP_ID + ':'))
+    .map(k => k.slice(APP_ID.length + 1));
+
+// ══════════════════════════════════════════════════════════════════
+//  Cloud mirror
+// ══════════════════════════════════════════════════════════════════
+
+// Telegram keeps a small key/value store per bot and user, synced across that
+// user's devices (Bot API 6.9+). Mirroring the settings there means a second
+// device starts out already pointing at the right spreadsheet. The store is
+// scoped to the bot, so keys go in under their bare name — ':' is not a legal
+// cloud key character anyway. Outside Telegram, or on an older client, `cloud`
+// stays null and everything below is a no-op: localStorage alone, as before.
+const cloud = window.Telegram?.WebApp?.isVersionAtLeast?.('6.9')
+  ? window.Telegram.WebApp.CloudStorage
+  : null;
+
+const CLOUD_MAX_BYTES = 4096;    // Telegram refuses anything longer
+const CLOUD_RETRY_MS  = 5000;
+const CLOUD_RETRY_MAX = 60000;
+
+const cloudPending = new Set();  // keys whose last cloud write failed
+let cloudRetryDelay = CLOUD_RETRY_MS;
+let cloudRetryTimer = null;
+
+/** Mirror one key upwards. Failures are queued, never surfaced to the user. */
+function cloudPut(key, value) {
+  if (!cloud) return;
+  if (new TextEncoder().encode(value).length > CLOUD_MAX_BYTES) {
+    // Too big to store. Drop whatever the cloud still holds under that key,
+    // or another device would later restore the stale copy over its own.
+    cloud.removeItem(key, () => {});
+    cloudPending.delete(key);
+    return;
+  }
+  cloud.setItem(key, value, err => {
+    if (!err) { cloudPending.delete(key); cloudRetryDelay = CLOUD_RETRY_MS; return; }
+    cloudPending.add(key);
+    cloudRetryTimer ??= setTimeout(cloudFlush, cloudRetryDelay);
+  });
+}
+
+/** Retry the queue, backing off while the writes keep failing. */
+function cloudFlush() {
+  cloudRetryTimer = null;
+  cloudRetryDelay = Math.min(cloudRetryDelay * 2, CLOUD_RETRY_MAX);
+  for (const key of [...cloudPending]) {
+    cloudPending.delete(key);
+    cloudPut(key, lsGet(key));   // the current value, not the one that failed
+  }
+}
+
+/**
+ * Reconcile localStorage with the cloud, once, before the state is read.
+ * Keys only the cloud has win — that is the copy the user's other devices
+ * already agreed on. Keys only this device has are pushed up, which is also
+ * what migrates an install that predates the mirror.
+ */
+function cloudSync() {
+  return new Promise(resolve => {
+    if (!cloud) return resolve();
+    cloud.getKeys((err, keys = []) => {
+      if (err) return resolve();
+      for (const key of localKeys()) {
+        if (!keys.includes(key)) cloudPut(key, lsGet(key));
+      }
+      if (!keys.length) return resolve();
+      cloud.getItems(keys, (err2, items) => {
+        if (!err2) {
+          for (const [key, value] of Object.entries(items || {})) {
+            if (value !== '') localStorage.setItem(APP_ID + ':' + key, value);
+          }
+        }
+        resolve();
+      });
+    });
+  });
+}
+
 // ══════════════════════════════════════════════════════════════════
 //  State
 // ══════════════════════════════════════════════════════════════════
 
+/** Everything persisted, read back out of localStorage. */
+function storedState() {
+  return {
+    spreadsheetId: lsGet('spreadsheetId'),
+    userName:      lsGet('userName'),
+    expenseType:   lsGet('expenseType') || 'outflow',
+    lang:          lsGet('lang'),
+    summaryMode:   lsGet('summaryMode') || 'month',
+    summaryView:   lsGet('summaryView') || 'category',
+    historyType:   lsGet('historyType') || 'outflow',
+
+    catCache: load('catCache', {}),                   // {outflow:[], inflow:[]}
+    hidden:   load('hidden', { outflow: [], inflow: [] }),
+    freq:     load('freq', {}),                       // {type: {category: uses}}
+    accounts:       load('accounts', []),
+    hiddenAccounts: load('hiddenAccounts', []),
+    txnTypes:       load('txnTypes', []),
+    hiddenTxnTypes: load('hiddenTxnTypes', []),
+    subcats:        load('subcats', {}),              // {category: [subcategory]}
+    hiddenSubcats:  load('hiddenSubcats', {}),
+
+    useSubcats:  load('useSubcats', true),
+    useAccounts: load('useAccounts', true),
+    useTxnTypes: load('useTxnTypes', false),
+    minusSign:   load('minusSign', false),
+    setupDone:   load('setupDone', false),
+  };
+}
+
 const S = {
-  spreadsheetId: lsGet('spreadsheetId'),
-  userName:      lsGet('userName'),
-  expenseType:   lsGet('expenseType') || 'outflow',
-  lang:          lsGet('lang'),
-  summaryMode:   lsGet('summaryMode') || 'month',
-  summaryView:   lsGet('summaryView') || 'category',
   summaryPeriod: '',
   settingsCatType: 'outflow',
-  historyType:   lsGet('historyType') || 'outflow',
   historyRecords: [],   // the page(s) currently listed, newest entry first
   historyHasMore: false,
   recordPicked:  null,  // the record the actions modal is open for
   editing:       null,  // {row, sig} while the form edits an existing record
   tgUser: null,
-
-  catCache: load('catCache', {}),                   // {outflow:[], inflow:[]}
-  hidden:   load('hidden', { outflow: [], inflow: [] }),
-  freq:     load('freq', {}),                       // {type: {category: uses}}
-  accounts:       load('accounts', []),
-  hiddenAccounts: load('hiddenAccounts', []),
-  txnTypes:       load('txnTypes', []),
-  hiddenTxnTypes: load('hiddenTxnTypes', []),
-  subcats:        load('subcats', {}),              // {category: [subcategory]}
-  hiddenSubcats:  load('hiddenSubcats', {}),
-
-  useSubcats:  load('useSubcats', true),
-  useAccounts: load('useAccounts', true),
-  useTxnTypes: load('useTxnTypes', false),
-  minusSign:   load('minusSign', false),
-  setupDone:   load('setupDone', false),
+  ...storedState(),
 };
 
 // v1 stored 'expense'/'income' where v2 uses 'outflow'/'inflow', and kept
-// subcategories in a flat array instead of one bucket per category.
-(function migrateV1() {
+// subcategories in a flat array instead of one bucket per category. Runs after
+// the cloud sync, so that a v1 copy pulled from another device is fixed too.
+function migrateV1() {
   let dirty = false;
   for (const bucket of [S.catCache, S.hidden, S.freq]) {
     if ('expense' in bucket) { bucket.outflow ??= bucket.expense; delete bucket.expense; dirty = true; }
@@ -80,7 +171,7 @@ const S = {
   if (S.expenseType === 'income')  { S.expenseType = 'inflow';  lsSet('expenseType', 'inflow'); }
   if (Array.isArray(S.subcats))       { S.subcats = {};       save('subcats', S.subcats); }
   if (Array.isArray(S.hiddenSubcats)) { S.hiddenSubcats = {}; save('hiddenSubcats', S.hiddenSubcats); }
-})();
+}
 
 // ══════════════════════════════════════════════════════════════════
 //  Localisation
@@ -1362,6 +1453,10 @@ async function init() {
     tg.BackButton?.onClick(() => history.back());
   }
   window.addEventListener('popstate', e => showTab(e.state?.tab || 'main', false));
+
+  await cloudSync();
+  Object.assign(S, storedState());
+  migrateV1();
 
   if (!S.lang) { $('lang-picker').style.display = 'flex'; return; }
   await fetchDictionary(S.lang);

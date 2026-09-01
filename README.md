@@ -24,7 +24,11 @@ Available in English, Russian and Vietnamese.
 
 The front-end keeps categories, settings and UI state in `localStorage` (every
 key namespaced by `APP_ID`, so several bots can share one browser origin) and
-reconciles them with the spreadsheet on start-up. Records are written
+reconciles them with the spreadsheet on start-up. The same keys are mirrored
+into Telegram's per-user `CloudStorage` when the client supports it (Bot API
+6.9+), so opening the app on a second device restores the settings instead of
+asking for them again; existing installs migrate themselves on first launch,
+and outside Telegram it falls back to `localStorage` alone. Records are written
 optimistically: the form clears immediately and the write finishes in the
 background, which keeps entering several purchases in a row fast.
 
